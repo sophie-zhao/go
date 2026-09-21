@@ -72,62 +72,31 @@ TEXT ·p256MovCond(SB),NOSPLIT,$0
         MOVV    res+0(FP), res_ptr
         MOVV    a+8(FP), a_ptr
         MOVV    b+16(FP), b_ptr
-        MOVV    cond+24(FP), R7
+        MOVV    cond+24(FP), t0
 
-        BEQ     R7, R0, res_b
+        // mask = -(cond != 0)
+        SGTU    R0, t0, t1
+        SUBV    t1, R0, t1
 
-res_a:
-        MOVV    (0*8)(a_ptr), R8
-        MOVV    (1*8)(a_ptr), R9
-        MOVV    (2*8)(a_ptr), R10
-        MOVV    (3*8)(a_ptr), R11
-        MOVV    (4*8)(a_ptr), R12
-        MOVV    (5*8)(a_ptr), R13
-        MOVV    (6*8)(a_ptr), R14
-        MOVV    (7*8)(a_ptr), R15
-        MOVV    (8*8)(a_ptr), R16
-        MOVV    (9*8)(a_ptr), R17
-        MOVV    (10*8)(a_ptr), R18
-        MOVV    (11*8)(a_ptr), R19
-        MOVV    R8, (0*8)(res_ptr)
-        MOVV    R9, (1*8)(res_ptr)
-        MOVV    R10, (2*8)(res_ptr)
-        MOVV    R11, (3*8)(res_ptr)
-        MOVV    R12, (4*8)(res_ptr)
-        MOVV    R13, (5*8)(res_ptr)
-        MOVV    R14, (6*8)(res_ptr)
-        MOVV    R15, (7*8)(res_ptr)
-        MOVV    R16, (8*8)(res_ptr)
-        MOVV    R17, (9*8)(res_ptr)
-        MOVV    R18, (10*8)(res_ptr)
-        MOVV    R19, (11*8)(res_ptr)
-        RET
-        
-res_b:
-        MOVV    (0*8)(b_ptr), R8
-        MOVV    (1*8)(b_ptr), R9
-        MOVV    (2*8)(b_ptr), R10
-        MOVV    (3*8)(b_ptr), R11
-        MOVV    (4*8)(b_ptr), R12
-        MOVV    (5*8)(b_ptr), R13
-        MOVV    (6*8)(b_ptr), R14
-        MOVV    (7*8)(b_ptr), R15
-        MOVV    (8*8)(b_ptr), R16
-        MOVV    (9*8)(b_ptr), R17
-        MOVV    (10*8)(b_ptr), R18
-        MOVV    (11*8)(b_ptr), R19
-        MOVV    R8, (0*8)(res_ptr)
-        MOVV    R9, (1*8)(res_ptr)
-        MOVV    R10, (2*8)(res_ptr)
-        MOVV    R11, (3*8)(res_ptr)
-        MOVV    R12, (4*8)(res_ptr)
-        MOVV    R13, (5*8)(res_ptr)
-        MOVV    R14, (6*8)(res_ptr)
-        MOVV    R15, (7*8)(res_ptr)
-        MOVV    R16, (8*8)(res_ptr)
-        MOVV    R17, (9*8)(res_ptr)
-        MOVV    R18, (10*8)(res_ptr)
-        MOVV    R19, (11*8)(res_ptr)
+        // Select each limb as:
+        //     b ^ ((a ^ b) & mask)
+        //
+        // The loop count is fixed at 12 and does not depend on cond.
+        MOVV    $0, t2
+        MOVV    $12, x0
+        MOVV    $0, t3
+
+p256MovCond_loop:
+        MOVV    (t3)(a_ptr), t4
+        MOVV    (t3)(b_ptr), t5
+        XOR     t4, t5, t6
+        AND     t1, t6, t6
+        XOR     t5, t6, t6
+        MOVV    t6, (t3)(res_ptr)
+
+        ADDV    $8, t3, t3
+        ADDV    $1, t2, t2
+        BNE     t2, x0, p256MovCond_loop
         RET
 
 /* ---------------------------------------*/
@@ -137,19 +106,28 @@ TEXT ·p256NegCond(SB),NOSPLIT,$0
         MOVV    val+0(FP), res_ptr
         MOVV    cond+8(FP), t0
 
-        // If condition is 0, keep original value
-        BEQ     t0, R0, ret
+        // mask = -(cond != 0)
+        SGTU    R0, t0, acc4
+        SUBV    acc4, R0, acc4
 
         // acc = poly
         MOVV    $-1, acc0
         MOVV    p256const0<>(SB), acc1
         MOVV    $0, acc2
         MOVV    p256const1<>(SB), acc3
+
         // Load the original value
         MOVV    (0*8)(res_ptr), t0
         MOVV    (1*8)(res_ptr), t1
         MOVV    (2*8)(res_ptr), t2
         MOVV    (3*8)(res_ptr), t3
+
+        // Keep the original value for the final constant-time selection.
+        MOVV    t0, x0
+        MOVV    t1, x1
+        MOVV    t2, x2
+        MOVV    t3, x3
+
         // Speculatively subtract
         SUBV    t0, acc0, t0
         SUBV    t1, acc1, t5    // x1 - y1 = z1', if z1' > x1 then overflow     
@@ -165,17 +143,36 @@ TEXT ·p256NegCond(SB),NOSPLIT,$0
         OR      t4, t5
         SUBV    t3, acc3, t3
         SUBV    t5, t3
-        // Store result
+
+        // Select original value when cond == 0, negated value otherwise.
+        // result = original ^ ((original ^ negated) & mask)
+        XOR     x0, t0, t4
+        AND     acc4, t4, t4
+        XOR     x0, t4, t0
+
+        XOR     x1, t1, t4
+        AND     acc4, t4, t4
+        XOR     x1, t4, t1
+
+        XOR     x2, t2, t4
+        AND     acc4, t4, t4
+        XOR     x2, t4, t2
+
+        XOR     x3, t3, t4
+        AND     acc4, t4, t4
+        XOR     x3, t4, t3
+
         MOVV    t0, (0*8)(res_ptr)
         MOVV    t1, (1*8)(res_ptr)
         MOVV    t2, (2*8)(res_ptr)
         MOVV    t3, (3*8)(res_ptr)
-ret:
-        RET
+         RET
 
 /* ---------------------------------------*/
 // p256Select sets res to the point at index idx in the table.
-// idx must be in [0, 15]. It executes in constant time.
+// idx must be in [0, 16]. It executes in constant time.
+// idx == 0 returns the point at infinity (all zeroes).
+// idx in [1, 16] selects table[idx-1].
 //
 // func p256Select(res *P256Point, table *p256Table, idx int)
 TEXT ·p256Select(SB),NOSPLIT,$0
@@ -183,37 +180,49 @@ TEXT ·p256Select(SB),NOSPLIT,$0
         MOVV    table+8(FP), a_ptr
         MOVV    res+0(FP), res_ptr
 
-        XVXORV  X0, X0, X0
-        XVXORV  X1, X1, X1
-        XVXORV  X2, X2, X2
+        // allones is used to invert the constant-time equality mask.
+        MOVV    $-1, x2
 
+        // Process all 12 limbs. For every limb, scan all 16 entries.
+        // Both loop counts are fixed and independent of idx.
+        MOVV    $0, x0
+        MOVV    $12, x1
+
+p256Select_limb:
         MOVV    $0, t1
-        MOVV    $16, t2
+        MOVV    a_ptr, t5
+        MOVV    $0, t6
 
-loop_select:
-        ADDV    $1, t1
-        BEQ     t1, t0, ok
-        BNE     t1, t2, loop_select
-        JMP     ret
+p256Select_entry:
+        // i is 1..16. Build:
+        //     mask = 0xffff...ffff iff idx == i
+        XOR     t0, t1, t2
+        SUBV    t2, R0, t3
+        OR      t2, t3, t3
+        SRAV    $63, t3, t3
+        XOR     t3, x2, t3
 
-ok:
-	SUBV    $1, t1, t1
-        MOVV    $96, t3
-        MULV    t1, t3, t3
-        ADDV    a_ptr, t3, a_ptr
-        XVMOVQ  (a_ptr), X0
-        XVMOVQ  32(a_ptr), X1
-        XVMOVQ  64(a_ptr), X2
+        MOVV    (t5), t4
+        AND     t3, t4, t4
+        OR      t6, t4, t6
 
-ret:
-        XVMOVQ X0, (res_ptr)
-        XVMOVQ X1, 32(res_ptr)
-        XVMOVQ X2, 64(res_ptr)
+        ADDV    $96, t5, t5
+        ADDV    $1, t1, t1
+        BNE     t1, x1, p256Select_entry
+
+        MOVV    t6, (res_ptr)
+        ADDV    $8, a_ptr, a_ptr
+        ADDV    $8, res_ptr, res_ptr
+        ADDV    $1, x0, x0
+        BNE     x0, x1, p256Select_limb
 
         RET
+
 /* ---------------------------------------*/
 // p256SelectAffine sets res to the point at index idx in the table.
-// idx must be in [0, 31]. It executes in constant time.
+// idx must be in [0, 32]. It executes in constant time.
+// idx == 0 returns the point at infinity (all zeroes).
+// idx in [1, 32] selects table[idx-1].
 //
 // func p256SelectAffine(res *p256AffinePoint, table *p256AffineTable, idx int)
 TEXT ·p256SelectAffine(SB),NOSPLIT,$0
@@ -221,29 +230,41 @@ TEXT ·p256SelectAffine(SB),NOSPLIT,$0
         MOVV    table+8(FP), a_ptr
         MOVV    res+0(FP), res_ptr
 
-        XVXORV  X0, X0, X0
-        XVXORV  X1, X1, X1
+        MOVV    $-1, x2
 
+        // Process all 8 limbs (x and y), scanning all 32 entries.
+        // The loop counts are fixed and independent of idx.
+        MOVV    $0, x0
+        MOVV    $8, x1
+	MOVV	$32, x3
+
+p256SelectAffine_limb:
         MOVV    $0, t1
-        MOVV    $32, t2
+        MOVV    a_ptr, t5
+        MOVV    $0, t6
 
-loop_select:
-        ADDV    $1, t1
-        BEQ     t1, t0, ok
-        BNE     t1, t2, loop_select
-        JMP     ret
+p256SelectAffine_entry:
+        // i is 1..32. Build:
+        //     mask = 0xffff...ffff iff idx == i
+        XOR     t0, t1, t2
+        SUBV    t2, R0, t3
+        OR      t2, t3, t3
+        SRAV    $63, t3, t3
+        XOR     t3, x2, t3
 
-ok:
-	SUBV    $1, t1, t1
-        MOVV    $64, t3
-        MULV    t1, t3, t3
-        ADDV    a_ptr, t3, a_ptr
-        XVMOVQ  (a_ptr), X0
-        XVMOVQ  32(a_ptr), X1
+        MOVV    (t5), t4
+        AND     t3, t4, t4
+        OR      t6, t4, t6
 
-ret:
-        XVMOVQ X0, (res_ptr)
-        XVMOVQ X1, 32(res_ptr)
+        ADDV    $64, t5, t5
+        ADDV    $1, t1, t1
+        BNE     t1, x3, p256SelectAffine_entry
+
+        MOVV    t6, (res_ptr)
+        ADDV    $8, a_ptr, a_ptr
+        ADDV    $8, res_ptr, res_ptr
+        ADDV    $1, x0, x0
+        BNE     x0, x1, p256SelectAffine_limb
 
         RET
 
