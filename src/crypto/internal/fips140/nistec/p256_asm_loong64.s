@@ -1278,7 +1278,6 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 #define rsqr(off)  (8 + 32*6 + off)(R3)  
 #define hcub(off)  (8 + 32*7 + off)(R3)  
 #define pointx3(off) (8 + 32*9 + off)(R3)
-#define pointy2(off) (8 + 32*10 + off)(R3)
 
 /*
  * slot 8:
@@ -1385,8 +1384,6 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	RELOAD_PTRS
 
 	MOVV	x3, pointx3(0)
-	MOVV	y2, pointy2(0)
-
 	LDx(z1in)  
 	CALL	p256SqrInternal<>(SB)    // z1^2  —— 调用后 a_ptr/b_ptr(=hlp0)/y1 已被污染  
 	STy(z1sqr)  
@@ -1394,16 +1391,26 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
   
 	LDx(x2in)  
 	CALL	p256MulInternal<>(SB)    // u2 = x2 * z1^2  
+	STy(rsqr)
 	RELOAD_PTRS  
   
 	LDx(x1in)  
+	LDy(rsqr)
 	CALL	p256SubInternal<>(SB)    // h = u2 - x1  
 	STx(hv)  
 	RELOAD_PTRS  
   
 	LDy(z1in)  
 	CALL	p256MulInternal<>(SB)    // z3 = h * z1  
+	STy(s2v)
 	RELOAD_PTRS  
+
+	MOVV	s2v(0*8), y0
+	MOVV	s2v(1*8), t4
+	MOVV	s2v(2*8), y2
+	MOVV	s2v(3*8), y3
+	RELOAD_PTRS
+	MOVV	t4, y1
   
 	// 条件覆盖 z3: 位0为0->z1; 位1为0->1  
 	MOVV	z1in(0*8), acc0  
@@ -1443,10 +1450,11 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
   
 	LDy(z1sqr)  
 	CALL	p256MulInternal<>(SB)    // z1^3  
+	STy(rsqr)
 	RELOAD_PTRS  
   
-  	MOVV	pointy2(0), y2
 	LDx(y2in)  
+	LDy(rsqr)
 	CALL	p256MulInternal<>(SB)    // s2 = y2in * z1^3  
 	STy(s2v)  
 	RELOAD_PTRS  
