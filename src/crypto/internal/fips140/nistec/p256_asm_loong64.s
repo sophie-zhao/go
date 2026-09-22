@@ -37,10 +37,10 @@
 #define x0      R26
 #define x1      R27
 #define x2      R28
-#define x3      R29
+#define x3      R29	// 暂时保留： 后续PointAdd中必须栈化
 #define y0      R23
 #define y1      a_ptr
-#define y2      R2
+#define y2      R2	// 暂时保留： 后续PointAdd中必须栈化
 #define y3      R31
 #define hlp0    b_ptr
 #define hlp1    t2
@@ -1277,6 +1277,8 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 #define hsqr(off)  (8 + 32*5 + off)(R3)  
 #define rsqr(off)  (8 + 32*6 + off)(R3)  
 #define hcub(off)  (8 + 32*7 + off)(R3)  
+#define pointx3(off) (8 + 32*9 + off)(R3)
+#define pointy2(off) (8 + 32*10 + off)(R3)
 
 /*
  * slot 8:
@@ -1309,7 +1311,7 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 	MOVV	in2+16(FP), b_ptr
 
 // func p256PointAddAffineAsm(res, in1 *P256Point, in2 *p256AffinePoint, sign, sel, zero int)  
-TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$288-48  
+TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48  
 	// sign/sel/zero 不能借用 hlp0(=b_ptr)/y1(=a_ptr)，先用 t5/t6 承接  
 	MOVV	sign+24(FP), t5      // t5 = sign  
 	MOVV	sel+32(FP), t6       // t6 = sel  
@@ -1381,6 +1383,10 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$288-48
   
 	// ---- Begin point add ----  
 	RELOAD_PTRS
+
+	MOVV	x3, pointx3(0)
+	MOVV	y2, pointy2(0)
+
 	LDx(z1in)  
 	CALL	p256SqrInternal<>(SB)    // z1^2  —— 调用后 a_ptr/b_ptr(=hlp0)/y1 已被污染  
 	STy(z1sqr)  
@@ -1439,6 +1445,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$288-48
 	CALL	p256MulInternal<>(SB)    // z1^3  
 	RELOAD_PTRS  
   
+  	MOVV	pointy2(0), y2
 	LDx(y2in)  
 	CALL	p256MulInternal<>(SB)    // s2 = y2in * z1^3  
 	STy(s2v)  
@@ -1489,6 +1496,8 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$288-48
 	MOVV	x1, y1  
 	MOVV	x2, y2  
 	MOVV	x3, y3  
+
+	MOVV	pointx3(0), x3
 	LDx(hcub)  
 	CALL	p256SubInternal<>(SB)   // x3 = 上一步结果 - hcub  
 	RELOAD_PTRS  
@@ -1529,6 +1538,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$288-48
 	MOVV	x2, 2*8(t0)  
 	MOVV	x3, 3*8(t0)  
   
+  	MOVV	pointx3(0), x3
 	LDy(hv)                          // u1'  
 	CALL	p256SubInternal<>(SB)    // tmp = u1' - x3  
 	RELOAD_PTRS  
