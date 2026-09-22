@@ -37,11 +37,13 @@
 #define x0      R26
 #define x1      R27
 #define x2      R28
-#define x3      R29	// 暂时保留： 后续PointAdd中必须栈化
+#define x3      R29
+
 #define y0      R23
 #define y1      a_ptr
-#define y2      R2	// 暂时保留： 后续PointAdd中必须栈化
+#define y2      R2
 #define y3      R31
+
 #define hlp0    b_ptr
 #define hlp1    t2
 
@@ -1288,6 +1290,12 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 #define flagbase(off)	(8 + 32*8 + off)(R3)
 #define selflag(off)	flagbase(off)
 #define signflag(off)	flagbase(8 + off)
+
+// PointAdd temporary spill slots.
+// x3/y2/y3 use R9/R2/R31 and must not be relied on across CALL.
+#define x3save(off) (8 + 32*9 + off)(R3)
+#define y2save(off) (8 + 32*10 + off)(R3)
+#define y3save(off) (8 + 32*11 + off)(R3)
   
 #define x1in(off) (off)(a_ptr)  
 #define y1in(off) (off+32)(a_ptr)  
@@ -1389,7 +1397,10 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
   
 	LDx(x2in)  
 	CALL	p256MulInternal<>(SB)    // u2 = x2 * z1^2  
-	STy(rsqr)
+	MOVV	y0, rsqr(0*8)
+	MOVV	y1, rsqr(1*8)
+	MOVV	y2, rsqr(2*8)
+	MOVV	y3, rsqr(3*8)
 	RELOAD_PTRS  
   
 	LDx(x1in)  
@@ -1407,8 +1418,8 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	MOVV	s2v(1*8), t4
 	MOVV	s2v(2*8), y2
 	MOVV	s2v(3*8), y3
-	RELOAD_PTRS
 	MOVV	t4, y1
+	RELOAD_PTRS
   
 	// 条件覆盖 z3: 位0为0->z1; 位1为0->1  
 	MOVV	z1in(0*8), acc0  
@@ -1448,7 +1459,10 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
   
 	LDy(z1sqr)  
 	CALL	p256MulInternal<>(SB)    // z1^3  
-	STy(rsqr)
+	MOVV	y0, rsqr(0*8)
+	MOVV	y1, rsqr(1*8)
+	MOVV	y2, rsqr(2*8)
+	MOVV	y3, rsqr(3*8)
 	RELOAD_PTRS  
   
 	LDx(y2in)  
@@ -1543,13 +1557,23 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	MOVV	x2, 2*8(t0)  
 	MOVV	x3, 3*8(t0)  
   
+  	MOVV	0*8(t0), x0
+  	MOVV	1*8(t0), x1
+  	MOVV	2*8(t0), x2
+  	MOVV	3*8(t0), x3
 	LDy(hv)                          // u1'  
 	CALL	p256SubInternal<>(SB)    // tmp = u1' - x3  
 	RELOAD_PTRS  
   
-	LDy(rv)  
+  	MOVV	rv(0*8), y0
+  	MOVV	rv(1*8), y1
+  	MOVV	rv(2*8), y2
+  	MOVV	rv(3*8), y3
 	CALL	p256MulInternal<>(SB)    // tmp2 = r * tmp  
-	STy(rv)
+	MOVV	y0, rv(0*8)
+	MOVV	y1, rv(1*8)
+	MOVV	y2, rv(2*8)
+	MOVV	y3, rv(3*8)
 	RELOAD_PTRS  
   
 	LDx(s2v)  
