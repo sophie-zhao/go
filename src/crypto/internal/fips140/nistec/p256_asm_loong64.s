@@ -1269,16 +1269,25 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 	OR	t4, hlp0, x3            ;
 
 /* ---------------------------------------*/  
-#define y2in(off)  (32*0 + off)(R3)  
-#define s2v(off)   (32*1 + off)(R3)  
-#define z1sqr(off) (32*2 + off)(R3)  
-#define hv(off)    (32*3 + off)(R3)  
-#define rv(off)    (32*4 + off)(R3)  
-#define hsqr(off)  (32*5 + off)(R3)  
-#define rsqr(off)  (32*6 + off)(R3)  
-#define hcub(off)  (32*7 + off)(R3)  
-// 额外增加一个变量槽位保存 sel|zero<<1 位掩码，跨越多次 CALL 时不能依赖寄存器存活
-#define selflag(off) (32*8 + off)(R3)
+#define y2in(off)  (8 + 32*0 + off)(R3)  
+#define s2v(off)   (8 + 32*1 + off)(R3)  
+#define z1sqr(off) (8 + 32*2 + off)(R3)  
+#define hv(off)    (8 + 32*3 + off)(R3)  
+#define rv(off)    (8 + 32*4 + off)(R3)  
+#define hsqr(off)  (8 + 32*5 + off)(R3)  
+#define rsqr(off)  (8 + 32*6 + off)(R3)  
+#define hcub(off)  (8 + 32*7 + off)(R3)  
+
+/*
+ * slot 8:
+ *  +0 : sel | (zero << 1)
+ *  +8 : normalized sign
+ *
+ * Both values need to survive CALLs, so keep them on the stack.
+ */
+#define flagbase(off)	(8 + 32*8 + off)(R3)
+#define selflag(off)	flagbase(off)
+#define signflag(off)	flagbase(8 + off)
   
 #define x1in(off) (off)(a_ptr)  
 #define y1in(off) (off+32)(a_ptr)  
@@ -1315,6 +1324,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$288-48
   
 	// sign 规整为 0/1，存入 t4（供后面条件选择使用）  
 	SGTU	R0, t5, t4  
+	MOVV	t4, signflag(0)		// sign 需要跨越后面的CALL， 立即保存到栈
   
 	MOVV	p256const0<>(SB), const0  
 	MOVV	p256const1<>(SB), const1  
@@ -1344,9 +1354,10 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$288-48
 	MOVV	y2inptr(2*8), y2
 	MOVV	y2inptr(3*8), y3
 
-	// t4 holds the normalized sign flag (0 or 1) computed earlier.
+	// Restore normalized sign from the stack.
 	// mask = 0 (sign==0, keep original) or all-ones (sign!=0, use negated)
-	SUBV	t4, R0, t2              // t2 = mask
+	MOVV	signflag(0), t4		// 从栈恢复 normalized sign
+	SUBV	t4, R0, t2		// t2 = mask
 	MOVV	$-1, t3
 	XOR	t2, t3, t3               // t3 = notmask
 
@@ -1369,6 +1380,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$288-48
 	STy(y2in)
   
 	// ---- Begin point add ----  
+	RELOAD_PTRS
 	LDx(z1in)  
 	CALL	p256SqrInternal<>(SB)    // z1^2  —— 调用后 a_ptr/b_ptr(=hlp0)/y1 已被污染  
 	STy(z1sqr)  
@@ -1569,12 +1581,12 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$288-48
 
 // ---------------------------------------  
 // PointDouble 专用栈变量（基于 SP 伪寄存器，避免与自动保存的 LR 冲突）  
-#define zsqrv(off) (32*0 + off)(R3)  
-#define mv(off)    (32*1 + off)(R3)  
-#define h2v(off)   (32*2 + off)(R3)  
-#define sv(off)    (32*3 + off)(R3)  
-#define tmpv(off)  (32*4 + off)(R3)  
-#define y3tmp(off) (32*5 + off)(R3)  
+#define zsqrv(off) (8 + 32*0 + off)(R3)  
+#define mv(off)    (8 + 32*1 + off)(R3)  
+#define h2v(off)   (8 + 32*2 + off)(R3)  
+#define sv(off)    (8 + 32*3 + off)(R3)  
+#define tmpv(off)  (8 + 32*4 + off)(R3)  
+#define y3tmp(off) (8 + 32*5 + off)(R3)  
   
 #define RELOAD_A \  
 	MOVV	in1+8(FP), a_ptr  
@@ -1827,18 +1839,18 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$192-16
 
 // ---------------------------------------  
 // p256PointAddAsm 专用栈变量（基于 SP 伪寄存器）  
-#define z2sqrv(off)  (32*0  + off)(R3)  
-#define s1v(off)     (32*1  + off)(R3)  
-#define z1sqrv(off)  (32*2  + off)(R3)  
-#define rv2(off)     (32*3  + off)(R3)   // r  
-#define u1v(off)     (32*4  + off)(R3)  
-#define u2v(off)     (32*5  + off)(R3)  
-#define hsqrv(off)   (32*6  + off)(R3)  
-#define rsqrv(off)   (32*7  + off)(R3)  
-#define hcubv(off)   (32*8  + off)(R3)  
-#define s2v2(off)    (32*9  + off)(R3)   // s2  
-#define hv2(off)     (32*10 + off)(R3)   // h  
-#define degflag(off) (32*11 + off)(R3)   // 退化点标志（仅用8字节）  
+#define z2sqrv(off)  (8 + 32*0  + off)(R3)  
+#define s1v(off)     (8 + 32*1  + off)(R3)  
+#define z1sqrv(off)  (8 + 32*2  + off)(R3)  
+#define rv2(off)     (8 + 32*3  + off)(R3)   // r  
+#define u1v(off)     (8 + 32*4  + off)(R3)  
+#define u2v(off)     (8 + 32*5  + off)(R3)  
+#define hsqrv(off)   (8 + 32*6  + off)(R3)  
+#define rsqrv(off)   (8 + 32*7  + off)(R3)  
+#define hcubv(off)   (8 + 32*8  + off)(R3)  
+#define s2v2(off)    (8 + 32*9  + off)(R3)   // s2  
+#define hv2(off)     (8 + 32*10 + off)(R3)   // h  
+#define degflag(off) (8 + 32*11 + off)(R3)   // 退化点标志（仅用8字节）  
   
 // y2in 仅在 b_ptr 仍指向 in2 时有效  
 #define y2inp(off) (off+32)(b_ptr)  
