@@ -1231,8 +1231,19 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 #define z3out(off) (off + 64)(res_ptr)
 #define y2inptr(off) (off+32)(b_ptr)  
   
-#define LDx(src) MOVV src(0*8),x0; MOVV src(1*8),x1; MOVV src(2*8),x2; MOVV src(3*8),x3  
-#define LDy(src) MOVV src(0*8),y0; MOVV src(1*8),y1; MOVV src(2*8),y2; MOVV src(3*8),y3  
+#define LDx(src) \
+	MOVV src(0*8),x0; \
+	MOVV src(1*8),x1; \
+	MOVV src(2*8),x2; \
+	MOVV src(3*8),x3
+
+#define LDy(src) \
+	MOVV src(0*8),y0; \
+	MOVV src(1*8),t4; \
+	MOVV src(2*8),y2; \
+	MOVV src(3*8),y3; \
+	MOVV t4, y1
+
 #define STx(dst) MOVV x0,dst(0*8); MOVV x1,dst(1*8); MOVV x2,dst(2*8); MOVV x3,dst(3*8)  
 #define STy(dst) MOVV y0,dst(0*8); MOVV y1,dst(1*8); MOVV y2,dst(2*8); MOVV y3,dst(3*8)  
 
@@ -1371,12 +1382,6 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	AND	t3, y1, y1; AND t2, acc1, acc1; OR y1, acc1, y1  
 	AND	t3, y2, y2; AND t2, acc2, acc2; OR y2, acc2, y2  
 	AND	t3, y3, y3; AND t2, acc3, acc3; OR y3, acc3, y3  
-  
-	MOVV	res+0(FP), t0            // res_ptr 需要重新从FP取，因为 res_ptr 也可能被内部函数用作 acc0 等  
-	MOVV	y0, 8*8(t0)  
-	MOVV	y1, 9*8(t0)  
-	MOVV	y2, 10*8(t0)  
-	MOVV	y3, 11*8(t0)  
   
 	LDy(z1sqr)  
 	CALL	p256MulInternal<>(SB)    // z1^3  
