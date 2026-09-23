@@ -1586,7 +1586,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	OR	t5, t6, hlp0             ;\  
 	\  
 	AND	$1, y0, t4               ;\  
-	SUBV	$0, t4, t4               ;\ /* t4 = 0(偶数)/全1(奇数) */  
+	NEGV	t4, t4               ;\ /* t4 = 0(偶数)/全1(奇数) */
 	MOVV	$-1, t5                  ;\  
 	XOR	t4, t5, t5               ;\ /* t5 = notmask */  
 	AND	t5, y0, acc0; AND t4, t0, acc4; OR acc0, acc4, t0 ;\  
