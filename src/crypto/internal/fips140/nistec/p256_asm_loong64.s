@@ -1352,6 +1352,10 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	MOVV	s2v(2*8), y2
 	MOVV	s2v(3*8), y3
 	MOVV	t4, y1
+
+	// y1与a_ptr使用同一个物理寄存器，重新加载z3后会覆盖a_ptr
+	// 后面的z1in需要a_ptr，因此这里必须再次恢复参数指针
+	RELOAD_PTRS
   
 	// 条件覆盖 z3: 位0为0->z1; 位1为0->1  
 	MOVV	z1in(0*8), acc0  
