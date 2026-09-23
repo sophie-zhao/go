@@ -1259,14 +1259,14 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	MOVV	zero+40(FP), t0      // t0 = zero  
   
 	// 规整 sel/zero 为 0/1，再合并成 hlp1 语义（这里直接用 t1 保存合并结果）  
-	SGTU	R0, t6, t2           // t2 = (sel != 0) ? 1 : 0  
-	SGTU	R0, t0, t3           // t3 = (zero != 0) ? 1 : 0  
+	SGTU	t6, R0, t2           // t2 = (sel != 0) ? 1 : 0  
+	SGTU	t0, R0, t3           // t3 = (zero != 0) ? 1 : 0  
 	SLLV	$1, t3, t3  
-	OR	t2, t3, t1           // t1 = sel_norm | (zero_norm<<1)，后续用它做位测试  
+	XOR	t2, t3, t1           // t1 = sel_norm ^ (zero_norm<<1)，后续用它做位测试  
 	MOVV    t1, selflag(0)       // 立即存回栈，不依赖寄存器跨越多次CALL存活
   
 	// sign 规整为 0/1，存入 t4（供后面条件选择使用）  
-	SGTU	R0, t5, t4  
+	SGTU	t5, R0, t4  
 	MOVV	t4, signflag(0)		// sign 需要跨越后面的CALL， 立即保存到栈
   
 	RELOAD_PTRS                 // 确保 a_ptr/b_ptr 干净  
@@ -1346,12 +1346,12 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	STy(s2v)
 	RELOAD_PTRS  
 
+	// p256MulInternal 会破坏 a_ptr/b_ptr/y1, 因此必须在 PELOAD_PTRS之后重新加载z3
 	MOVV	s2v(0*8), y0
 	MOVV	s2v(1*8), t4
 	MOVV	s2v(2*8), y2
 	MOVV	s2v(3*8), y3
 	MOVV	t4, y1
-	RELOAD_PTRS
   
 	// 条件覆盖 z3: 位0为0->z1; 位1为0->1  
 	MOVV	z1in(0*8), acc0  
@@ -1383,6 +1383,13 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	AND	t3, y2, y2; AND t2, acc2, acc2; OR y2, acc2, y2  
 	AND	t3, y3, y3; AND t2, acc3, acc3; OR y3, acc3, y3  
   
+	// Save the selected z3 before loading the next temporary.
+	MOVV	res+0(FP), t0
+	MOVV	y0, 4*8(t0)
+	MOVV	y1, 5*8(t0)
+	MOVV	y2, 6*8(t0)
+	MOVV	y3, 7*8(t0)
+
 	LDy(z1sqr)  
 	CALL	p256MulInternal<>(SB)    // z1^3  
 	MOVV	y0, rsqr(0*8)
