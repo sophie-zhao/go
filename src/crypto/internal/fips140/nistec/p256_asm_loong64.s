@@ -37,18 +37,15 @@
 #define x0      R26
 #define x1      R27
 #define x2      R28
-#define x3      R29
+#define x3      R20
 
 #define y0      R23
 #define y1      a_ptr
-#define y2      R2
+#define y2      R21
 #define y3      R31
 
 #define hlp0    b_ptr
 #define hlp1    t2
-
-#define const0  R20  
-#define const1  R21
 
 DATA p256const0<>+0x00(SB)/8, $0x00000000ffffffff
 DATA p256const1<>+0x00(SB)/8, $0xffffffff00000001
@@ -496,35 +493,6 @@ TEXT p256SubInternal<>(SB),NOSPLIT,$0
   
 	RET
 
-// p256SubInternalTest 是仅用于测试的包装函数，把 p256SubInternal<> 的  
-// 寄存器级调用约定转换成标准的指针参数形式：  
-//   res = y - x mod P    (注意 p256SubInternal 的语义是 y0-y3 减 x0-x3，  
-//                          而不是 x - y，务必在测试断言里保持一致)  
-//  
-// func p256SubInternalTest(res, x, y *p256asmtestElement)  
-//TEXT ·p256SubInternalTest(SB),NOSPLIT,$0-24  
-//	MOVV	res+0(FP), res_ptr  
-//	MOVV	a+8(FP), a_ptr  
-//	MOVV	b+16(FP), b_ptr  
-//  
-//	MOVV	0*8(a_ptr), x0  
-//	MOVV	1*8(a_ptr), x1  
-//	MOVV	2*8(a_ptr), x2  
-//	MOVV	3*8(a_ptr), x3  
-//  
-//	MOVV	0*8(b_ptr), y0  
-//	MOVV	1*8(b_ptr), y1  
-//	MOVV	2*8(b_ptr), y2  
-//	MOVV	3*8(b_ptr), y3  
-//  
-//	CALL	p256SubInternal<>(SB)  
-//  
-//	MOVV	x0, 0*8(res_ptr)  
-//	MOVV	x1, 1*8(res_ptr)  
-//	MOVV	x2, 2*8(res_ptr)  
-//	MOVV	x3, 3*8(res_ptr)  
-//	RET
-
 // p256SqrInternal computes acc0..acc3 = x0..x3 * x0..x3 mod P (Montgomery domain).  
 // Clobbers t0-t6, acc0-acc7. Result left in acc0-acc3 (mirrors ARM64's y0-y3 output  
 // convention is NOT followed here -- see note below).  
@@ -648,8 +616,9 @@ TEXT p256SqrInternal<>(SB),NOSPLIT,$0
 	// ---- First reduction step ----  
 	SLLV	$32, acc0, t2  
 	SRLV	$32, acc0, t0  
-	MULV	acc0, const1, t1  
-	MULHVU	acc0, const1, acc0  
+	MOVV	p256const1<>(SB), t6
+	MULV	acc0, t6, t1
+	MULHVU	acc0, t6, acc0
 	ADDV	t2, acc1, acc1  
 	SGTU	t2, acc1, t3  
 	ADDV	t0, acc2, acc2  
@@ -667,8 +636,9 @@ TEXT p256SqrInternal<>(SB),NOSPLIT,$0
 	// ---- Second reduction step ----  
 	SLLV	$32, acc1, t2  
 	SRLV	$32, acc1, t0  
-	MULV	acc1, const1, t1  
-	MULHVU	acc1, const1, acc1  
+	MOVV	p256const1<>(SB), t6
+	MULV	acc1, t6, t1  
+	MULHVU	acc1, t6, acc1  
 	ADDV	t2, acc2, acc2  
 	SGTU	t2, acc2, t3  
 	ADDV	t0, acc3, acc3  
@@ -686,8 +656,9 @@ TEXT p256SqrInternal<>(SB),NOSPLIT,$0
 	// ---- Third reduction step ----  
 	SLLV	$32, acc2, t2  
 	SRLV	$32, acc2, t0  
-	MULV	acc2, const1, t1  
-	MULHVU	acc2, const1, acc2  
+	MOVV	p256const1<>(SB), t6
+	MULV	acc2, t6, t1  
+	MULHVU	acc2, t6, acc2  
 	ADDV	t2, acc3, acc3  
 	SGTU	t2, acc3, t3  
 	ADDV	t0, acc0, acc0  
@@ -705,8 +676,9 @@ TEXT p256SqrInternal<>(SB),NOSPLIT,$0
 	// ---- Last reduction step ----  
 	SLLV	$32, acc3, t2  
 	SRLV	$32, acc3, t0  
-	MULV	acc3, const1, t1  
-	MULHVU	acc3, const1, acc3  
+	MOVV	p256const1<>(SB), t6
+	MULV	acc3, t6, t1  
+	MULHVU	acc3, t6, acc3  
 	ADDV	t2, acc0, acc0  
 	SGTU	t2, acc0, t3  
 	ADDV	t0, acc1, acc1  
@@ -743,8 +715,9 @@ TEXT p256SqrInternal<>(SB),NOSPLIT,$0
 	// ---- Final conditional subtraction of P ----  
 	SUBV	$-1, acc0, t0  
 	SGTU	t0, acc0, t3  
-	SUBV	const0, acc1, t1  
-	SGTU	t1, acc1, t4  
+	MOVV	p256const0<>(SB), t5
+	SUBV	t5, acc1, t1  
+	SGTU	t5, acc1, t4  
 	SGTU	t3, t1, t5 
 	SUBV	t3, t1, t1  
 	OR	t4, t5, t3  
@@ -752,7 +725,8 @@ TEXT p256SqrInternal<>(SB),NOSPLIT,$0
 	SGTU	t3, t2, t4  
 	SUBV	t3, t2, t2
 	MOVV	t4, t3  
-	SUBV	const1, acc3, y0  
+	MOVV	p256const1<>(SB), t6
+	SUBV	t6, acc3, y0  
 	SGTU	y0, acc3, t4  
 	SGTU	t3, y0, t5  
 	SUBV	t3, y0, y0  
@@ -787,39 +761,11 @@ TEXT p256SqrInternal<>(SB),NOSPLIT,$0
   
 	RET
 
-// p256SqrInternalTest 是仅用于测试的包装函数，把 p256SqrInternal<> 的  
-// 寄存器级调用约定转换成标准的指针参数形式：  
-//   res = x^2 * R^-1 mod P   (蒙哥马利域内平方，R = 2^256)  
-//  
-// func p256SqrInternalTest(res, x *p256asmtestElement)  
-//TEXT ·p256SqrInternalTest(SB),NOSPLIT,$0-16  
-//	MOVV	res+0(FP), res_ptr  
-//	MOVV	x+8(FP), a_ptr  
-//  
-//	MOVV	p256const0<>(SB), const0  
-//	MOVV	p256const1<>(SB), const1  
-//  
-//	MOVV	0*8(a_ptr), x0  
-//	MOVV	1*8(a_ptr), x1  
-//	MOVV	2*8(a_ptr), x2  
-//	MOVV	3*8(a_ptr), x3  
-//  
-//	CALL	p256SqrInternal<>(SB)  
-//  
-//	MOVV	y0, 0*8(res_ptr)  
-//	MOVV	y1, 1*8(res_ptr)  
-//	MOVV	y2, 2*8(res_ptr)  
-//	MOVV	y3, 3*8(res_ptr)  
-//	RET
-
 // func p256Sqr(res, in *p256Element, n int)
 TEXT ·p256Sqr(SB),NOSPLIT,$0
 	MOVV	res+0(FP), res_ptr
 	MOVV	in+8(FP), a_ptr
 	MOVV	n+16(FP), b_ptr
-
-	MOVV	p256const0<>(SB), const0
-	MOVV	p256const1<>(SB), const1
 
 	MOVV	0*8(a_ptr), x0
 	MOVV	1*8(a_ptr), x1
@@ -868,8 +814,9 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     // ---- 第一次约简 ----
     SLLV    $32, acc0, t2
     SRLV    $32, acc0, t0
-    MULV    acc0, const1, t1
-    MULHVU  acc0, const1, acc0
+    MOVV    p256const1<>(SB), t6
+    MULV    acc0, t6, t1
+    MULHVU  acc0, t6, acc0
 
     ADDV    t2, acc1, acc1
     SGTU    t2, acc1, t3
@@ -926,8 +873,9 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     // ---- 第二次约简 ----
     SLLV    $32, acc1, t2
     SRLV    $32, acc1, t0
-    MULV    acc1, const1, t1
-    MULHVU  acc1, const1, acc1
+    MOVV    p256const1<>(SB), t6
+    MULV    acc1, t6, t1
+    MULHVU  acc1, t6, acc1
 
     ADDV    t2, acc2, acc2
     SGTU    t2, acc2, t3
@@ -984,8 +932,9 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     // ---- 第三次约简 ----
     SLLV    $32, acc2, t2
     SRLV    $32, acc2, t0
-    MULV    acc2, const1, t1
-    MULHVU  acc2, const1, acc2
+    MOVV    p256const1<>(SB), t6
+    MULV    acc2, t6, t1
+    MULHVU  acc2, t6, acc2
 
     ADDV    t2, acc3, acc3
     SGTU    t2, acc3, t3
@@ -1042,8 +991,9 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     // ---- 第四次约简 ----
     SLLV    $32, acc3, t2
     SRLV    $32, acc3, t0
-    MULV    acc3, const1, t1
-    MULHVU  acc3, const1, acc3
+    MOVV    p256const1<>(SB), t6
+    MULV    acc3, t6, t1
+    MULHVU  acc3, t6, acc3
 
     ADDV    t2, acc0, acc0
     SGTU    t2, acc0, t3
@@ -1088,8 +1038,9 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     SGTU    t6, acc0, t5        // borrow0 = 1 if acc0 < 0xFFFFFFFFFFFFFFFF
     ADDV    $1, acc0, t0        // d0 = acc0 + 1
 
-    SUBV    const0, acc1, t1
-    SGTU    const0, acc1, t4
+    MOVV    p256const0<>(SB), t6
+    SUBV    t6, acc1, t1
+    SGTU    t6, acc1, t4
     MOVV    t1, t6
     SUBV    t5, t1, t1
     SGTU    t1, t6, t6
@@ -1102,8 +1053,9 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     SGTU    t2, t6, t6
     OR      t4, t6, t5
 
-    SUBV    const1, acc3, t3
-    SGTU    const1, acc3, t4
+    MOVV    p256const1<>(SB), t6
+    SUBV    t6, acc3, t3
+    SGTU    t6, acc3, t4
     MOVV    t3, t6
     SUBV    t5, t3, t3
     SGTU    t3, t6, t6
@@ -1149,9 +1101,6 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 	MOVV	in1+8(FP), a_ptr  
 	MOVV	in2+16(FP), b_ptr  
   
-	MOVV	p256const0<>(SB), const0  
-	MOVV	p256const1<>(SB), const1  
-  
 	MOVV	0*8(a_ptr), x0  
 	MOVV	1*8(a_ptr), x1  
 	MOVV	2*8(a_ptr), x2  
@@ -1169,33 +1118,6 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 	MOVV	y2, 2*8(res_ptr)  
 	MOVV	y3, 3*8(res_ptr)  
 	RET
-
-// func p256MulInternalTest(res, a, b *p256asmtestElement)
-//TEXT ·p256MulInternalTest(SB),NOSPLIT,$0-24
-//        MOVV    res+0(FP), res_ptr
-//        MOVV    a+8(FP), a_ptr
-//        MOVV    b+16(FP), b_ptr
-//
-//        MOVV    p256const0<>(SB), const0
-//        MOVV    p256const1<>(SB), const1
-//
-//        MOVV    0*8(a_ptr), x0
-//        MOVV    1*8(a_ptr), x1
-//        MOVV    2*8(a_ptr), x2
-//        MOVV    3*8(a_ptr), x3
-//
-//        MOVV    0*8(b_ptr), y0
-//        MOVV    1*8(b_ptr), y1
-//        MOVV    2*8(b_ptr), y2
-//        MOVV    3*8(b_ptr), y3
-//
-//        CALL    p256MulInternal<>(SB)
-//
-//        MOVV    y0, 0*8(res_ptr)
-//        MOVV    y1, 1*8(res_ptr)
-//        MOVV    y2, 2*8(res_ptr)
-//        MOVV    y3, 3*8(res_ptr)
-//        RET
 
 /* ---------------------------------------*/  
 #define p256MulBy2Inline \
@@ -1226,8 +1148,9 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 	SGTU	t6, x0, t5              ;\
 	ADDV	$1, x0, t0              ;\
 	\
-	SUBV	const0, x1, t1          ;\
-	SGTU	const0, x1, t4          ;\
+	MOVV	p256const0<>(SB), t5	;\
+	SUBV	t5, x1, t1	        ;\
+	SGTU	t5, x1, t4              ;\
 	MOVV	t1, t6                  ;\
 	SUBV	t5, t1, t1              ;\
 	SGTU	t1, t6, t6              ;\
@@ -1240,8 +1163,9 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 	SGTU	t2, t6, t6              ;\
 	OR	t4, t6, t5              ;\
 	\
-	SUBV	const1, x3, t3          ;\
-	SGTU	const1, x3, t4          ;\
+	MOVV	p256const1<>(SB), t6	;\
+	SUBV	t6, x3, t3              ;\
+	SGTU	t6, x3, t4              ;\
 	MOVV	t3, t6                  ;\
 	SUBV	t5, t3, t3              ;\
 	SGTU	t3, t6, t6              ;\
@@ -1291,11 +1215,11 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 #define selflag(off)	flagbase(off)
 #define signflag(off)	flagbase(8 + off)
 
-// PointAdd temporary spill slots.
-// x3/y2/y3 use R9/R2/R31 and must not be relied on across CALL.
-#define x3save(off) (8 + 32*9 + off)(R3)
-#define y2save(off) (8 + 32*10 + off)(R3)
-#define y3save(off) (8 + 32*11 + off)(R3)
+//// PointAdd temporary spill slots.
+//// x3/y2/y3 use R9/R2/R31 and must not be relied on across CALL.
+//#define x3save(off) (8 + 32*9 + off)(R3)
+//#define y2save(off) (8 + 32*10 + off)(R3)
+//#define y3save(off) (8 + 32*11 + off)(R3)
   
 #define x1in(off) (off)(a_ptr)  
 #define y1in(off) (off+32)(a_ptr)  
@@ -1333,9 +1257,6 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	// sign 规整为 0/1，存入 t4（供后面条件选择使用）  
 	SGTU	R0, t5, t4  
 	MOVV	t4, signflag(0)		// sign 需要跨越后面的CALL， 立即保存到栈
-  
-	MOVV	p256const0<>(SB), const0  
-	MOVV	p256const1<>(SB), const1  
   
 	RELOAD_PTRS                 // 确保 a_ptr/b_ptr 干净  
   
@@ -1634,18 +1555,20 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 // ---- 模P半减：y0..y3 = (y0..y3) / 2 mod P ----  
 // 若为偶数直接右移1位；若为奇数先加P再右移1位  
 #define p256HalveInline \  
-	ADDV	$-1, y0, t0             ;\  
+	ADDV	$-1, y0, t0              ;\  
 	SGTU	$-1, t0, t4              ;\  
-	ADDV	const0, y1, t1           ;\  
-	SGTU    const0, t1, t5           ;\
+	MOVV	p256const0<>(SB), t5	 ;\
+	ADDV	t5, y1, t1               ;\  
+	SGTU    t5, t1, t5               ;\
 	ADDV	t4, t1, t1               ;\  
 	SGTU    t4, t1, t6               ;\ 
 	OR	t5, t6, t4               ;\  
 	ADDV	$0, y2, t2               ;\  
 	ADDV	t4, t2, t2               ;\  
 	SGTU	t4, t2, t4               ;\  
-	ADDV	const1, y3, t3           ;\  
-	SGTU    const1, t3, t5           ;\
+	MOVV	p256const1<>(SB), t5	 ;\
+	ADDV	t5, y3, t3               ;\  
+	SGTU    t5, t3, t5               ;\
 	ADDV	t4, t3, t3               ;\  
 	SGTU    t4, t3, t6               ;\
 	OR	t5, t6, hlp0             ;\  
@@ -1696,8 +1619,9 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	\  
 	SUBV	$-1, x0, t0            ;\ /* t0 = x0 - P0  (P0 = -1，即 0xFFFF...FFFF) */  
 	SGTU	$-1, x0, t4            ;\ /* t4 = borrow0 = (x0 < P0) */  
-	SUBV	const0, x1, t1         ;\  
-	SGTU	const0, x1, t5         ;\  
+	MOVV	p256const0<>(SB), t5   ;\
+	SUBV	t5, x1, t1             ;\  
+	SGTU	t5, x1, t5             ;\  
 	SUBV	t4, t1, t1             ;\  
 	SGTU	t4, t1, t6             ;\  
 	OR	t5, t6, t4             ;\  
@@ -1706,8 +1630,9 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	SUBV	t4, t2, t2             ;\  
 	SGTU	t4, t2, t6             ;\  
 	OR	t5, t6, t4             ;\  
-	SUBV	const1, x3, t3         ;\  
-	SGTU	const1, x3, t5         ;\  
+	MOVV	p256const1<>(SB), t5   ;\
+	SUBV	t5, x3, t3             ;\  
+	SGTU	t5, x3, t5             ;\  
 	SUBV	t4, t3, t3             ;\  
 	SGTU	t4, t3, t6             ;\  
 	OR	t5, t6, t4             ;\ /* t4 = 4-limb 借位 (1 表示 x < P，无需减) */  
@@ -1734,8 +1659,6 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$192-16  
 	MOVV	res+0(FP), res_ptr  
 	MOVV	in+8(FP), a_ptr  
-	MOVV	p256const0<>(SB), const0  
-	MOVV	p256const1<>(SB), const1  
   
 	// zsqr = Z1^2  
 	LDx(z1in)  
@@ -1905,9 +1828,6 @@ TEXT ·p256PointAddAsm(SB),0,$392-32
 	MOVV	in1+8(FP), a_ptr  
 	MOVV	in2+16(FP), b_ptr  
   
-	MOVV	p256const0<>(SB), const0  
-	MOVV	p256const1<>(SB), const1  
-  
 	// ---- z2sqr = Z2^2 ----  
 	LDx(z2in)  
 	CALL	p256SqrInternal<>(SB)  
@@ -1968,8 +1888,10 @@ TEXT ·p256PointAddAsm(SB),0,$392-32
 	AND	t1, t2, hlp1        // hlp1 = r==0 ? 1 : 0 (临时，稍后立即落栈)  
   
 	XOR	$-1, x0, t0  
-	XOR	const0, x1, t1  
-	XOR	const1, x3, t3  
+	MOVV	p256const0<>(SB), t5
+	XOR	t5, x1, t1  
+	MOVV	p256const1<>(SB), t6
+	XOR	t6, x3, t3  
 	OR	t0, t1, t0  
 	OR	x2, t3, t1  
 	OR	t1, t0, t0  
@@ -2006,8 +1928,10 @@ TEXT ·p256PointAddAsm(SB),0,$392-32
 	AND	t1, t2, hlp0  
   
 	XOR	$-1, x0, t0  
-	XOR	const0, x1, t1  
-	XOR	const1, x3, t3  
+	MOVV	p256const0<>(SB), t5
+	XOR	t5, x1, t1  
+	MOVV	p256const1<>(SB), t6
+	XOR	t6, x3, t3  
 	OR	t0, t1, t0  
 	OR	x2, t3, t1  
 	OR	t1, t0, t0  
