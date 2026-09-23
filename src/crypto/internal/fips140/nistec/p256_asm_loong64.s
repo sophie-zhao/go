@@ -1360,7 +1360,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	MOVV	z1in(3*8), acc3  
 	MOVV    selflag(0), t1       // 重新加载位掩码，t1可能已被内部函数调用覆写
         AND     $1, t1, t2  
-	SUBV	$0, t2, t2               // 0/1 -> 0/全1掩码  
+	NEGV	t2, t2               // 0/1 -> 0/全1掩码  
 	MOVV	$-1, t3  
 	XOR	t2, t3, t3               // t3 = ~mask  
 	AND	t3, y0, y0; AND t2, acc0, acc0; OR y0, acc0, y0  
@@ -1375,7 +1375,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	MOVV    selflag(0), t1
 	AND	$2, t1, t2  
 	SRLV	$1, t2, t2  
-	SUBV	$0, t2, t2  
+	NEGV	t2, t2
 	MOVV	$-1, t3  
 	XOR	t2, t3, t3  
 	AND	t3, y0, y0; AND t2, acc0, acc0; OR y0, acc0, y0  
@@ -1461,7 +1461,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	MOVV	x1in(3*8), acc3  
 	MOVV    selflag(0), t1
 	AND	$1, t1, t2  
-	SUBV	$0, t2, t2  
+	NEGV	t2, t2  
 	MOVV	$-1, t3  
 	XOR	t2, t3, t3  
 	AND	t3, x0, x0; AND t2, acc0, acc0; OR x0, acc0, x0  
@@ -1476,7 +1476,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	MOVV    selflag(0), t1
 	AND	$2, t1, t2  
 	SRLV	$1, t2, t2  
-	SUBV	$0, t2, t2  
+	NEGV	t2, t2  
 	MOVV	$-1, t3  
 	XOR	t2, t3, t3  
 	AND	t3, x0, x0; AND t2, acc0, acc0; OR x0, acc0, x0  
@@ -1521,7 +1521,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	MOVV	y1in(3*8), acc3  
 	MOVV    selflag(0), t1
 	AND	$1, t1, t2  
-	SUBV	$0, t2, t2  
+	NEGV	t2, t2  
 	MOVV	$-1, t3  
 	XOR	t2, t3, t3  
 	AND	t3, x0, x0; AND t2, acc0, acc0; OR x0, acc0, x0  
@@ -1536,7 +1536,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	MOVV    selflag(0), t1
 	AND	$2, t1, t2  
 	SRLV	$1, t2, t2  
-	SUBV	$0, t2, t2  
+	NEGV	t2, t2  
 	MOVV	$-1, t3  
 	XOR	t2, t3, t3  
 	AND	t3, x0, x0; AND t2, acc0, acc0; OR x0, acc0, x0  
