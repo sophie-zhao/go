@@ -1369,10 +1369,10 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	NEGV	t2, t2               // 0/1 -> 0/全1掩码  
 	MOVV	$-1, t3  
 	XOR	t2, t3, t3               // t3 = ~mask  
-	AND	t3, y0, y0; AND t2, acc0, acc0; OR y0, acc0, y0  
-	AND	t3, y1, y1; AND t2, acc1, acc1; OR y1, acc1, y1  
-	AND	t3, y2, y2; AND t2, acc2, acc2; OR y2, acc2, y2  
-	AND	t3, y3, y3; AND t2, acc3, acc3; OR y3, acc3, y3  
+	AND	t2, y0, y0; AND t3, acc0, acc0; OR y0, acc0, y0  
+	AND	t2, y1, y1; AND t3, acc1, acc1; OR y1, acc1, y1  
+	AND	t2, y2, y2; AND t3, acc2, acc2; OR y2, acc2, y2  
+	AND	t2, y3, y3; AND t3, acc3, acc3; OR y3, acc3, y3  
   
 	MOVV	p256one<>+0x00(SB), acc0  
 	MOVV	p256one<>+0x08(SB), acc1  
@@ -1384,10 +1384,10 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	NEGV	t2, t2
 	MOVV	$-1, t3  
 	XOR	t2, t3, t3  
-	AND	t3, y0, y0; AND t2, acc0, acc0; OR y0, acc0, y0  
-	AND	t3, y1, y1; AND t2, acc1, acc1; OR y1, acc1, y1  
-	AND	t3, y2, y2; AND t2, acc2, acc2; OR y2, acc2, y2  
-	AND	t3, y3, y3; AND t2, acc3, acc3; OR y3, acc3, y3  
+	AND	t2, y0, y0; AND t3, acc0, acc0; OR y0, acc0, y0  
+	AND	t2, y1, y1; AND t3, acc1, acc1; OR y1, acc1, y1  
+	AND	t2, y2, y2; AND t3, acc2, acc2; OR y2, acc2, y2  
+	AND	t2, y3, y3; AND t3, acc3, acc3; OR y3, acc3, y3  
   
 	// Save the selected z3 before loading the next temporary.
 	MOVV	res+0(FP), t0
@@ -1471,10 +1471,10 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	NEGV	t2, t2  
 	MOVV	$-1, t3  
 	XOR	t2, t3, t3  
-	AND	t3, x0, x0; AND t2, acc0, acc0; OR x0, acc0, x0  
-	AND	t3, x1, x1; AND t2, acc1, acc1; OR x1, acc1, x1  
-	AND	t3, x2, x2; AND t2, acc2, acc2; OR x2, acc2, x2  
-	AND	t3, x3, x3; AND t2, acc3, acc3; OR x3, acc3, x3  
+	AND	t2, x0, x0; AND t3, acc0, acc0; OR x0, acc0, x0  
+	AND	t2, x1, x1; AND t3, acc1, acc1; OR x1, acc1, x1  
+	AND	t2, x2, x2; AND t3, acc2, acc2; OR x2, acc2, x2  
+	AND	t2, x3, x3; AND t3, acc3, acc3; OR x3, acc3, x3  
   
 	MOVV	x2in(0*8), acc0  
 	MOVV	x2in(1*8), acc1  
@@ -1486,10 +1486,10 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	NEGV	t2, t2  
 	MOVV	$-1, t3  
 	XOR	t2, t3, t3  
-	AND	t3, x0, x0; AND t2, acc0, acc0; OR x0, acc0, x0  
-	AND	t3, x1, x1; AND t2, acc1, acc1; OR x1, acc1, x1  
-	AND	t3, x2, x2; AND t2, acc2, acc2; OR x2, acc2, x2  
-	AND	t3, x3, x3; AND t2, acc3, acc3; OR x3, acc3, x3  
+	AND	t2, x0, x0; AND t3, acc0, acc0; OR x0, acc0, x0  
+	AND	t2, x1, x1; AND t3, acc1, acc1; OR x1, acc1, x1  
+	AND	t2, x2, x2; AND t3, acc2, acc2; OR x2, acc2, x2  
+	AND	t2, x3, x3; AND t3, acc3, acc3; OR x3, acc3, x3  
   
 	MOVV	res+0(FP), t0  
 	MOVV	x0, 0*8(t0)  
@@ -1531,10 +1531,10 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	NEGV	t2, t2  
 	MOVV	$-1, t3  
 	XOR	t2, t3, t3  
-	AND	t3, x0, x0; AND t2, acc0, acc0; OR x0, acc0, x0  
-	AND	t3, x1, x1; AND t2, acc1, acc1; OR x1, acc1, x1  
-	AND	t3, x2, x2; AND t2, acc2, acc2; OR x2, acc2, x2  
-	AND	t3, x3, x3; AND t2, acc3, acc3; OR x3, acc3, x3  
+	AND	t2, x0, x0; AND t3, acc0, acc0; OR x0, acc0, x0  
+	AND	t2, x1, x1; AND t3, acc1, acc1; OR x1, acc1, x1  
+	AND	t2, x2, x2; AND t3, acc2, acc2; OR x2, acc2, x2  
+	AND	t2, x3, x3; AND t3, acc3, acc3; OR x3, acc3, x3  
   
 	MOVV	y2in(0*8), acc0  
 	MOVV	y2in(1*8), acc1  
@@ -1546,10 +1546,10 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	NEGV	t2, t2  
 	MOVV	$-1, t3  
 	XOR	t2, t3, t3  
-	AND	t3, x0, x0; AND t2, acc0, acc0; OR x0, acc0, x0  
-	AND	t3, x1, x1; AND t2, acc1, acc1; OR x1, acc1, x1  
-	AND	t3, x2, x2; AND t2, acc2, acc2; OR x2, acc2, x2  
-	AND	t3, x3, x3; AND t2, acc3, acc3; OR x3, acc3, x3  
+	AND	t2, x0, x0; AND t3, acc0, acc0; OR x0, acc0, x0  
+	AND	t2, x1, x1; AND t3, acc1, acc1; OR x1, acc1, x1  
+	AND	t2, x2, x2; AND t3, acc2, acc2; OR x2, acc2, x2  
+	AND	t2, x3, x3; AND t3, acc3, acc3; OR x3, acc3, x3  
   
 	MOVV	res+0(FP), t0  
 	MOVV	x0, 4*8(t0)  
