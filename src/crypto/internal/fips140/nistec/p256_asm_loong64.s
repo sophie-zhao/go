@@ -1237,6 +1237,8 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 	MOVV src(2*8),x2; \
 	MOVV src(3*8),x3
 
+// LDy deliberately loads limb 1 into t4 first because y1 must not alias
+// either a_ptr or b_ptr. All source limbs are loaded before y1 is written.
 #define LDy(src) \
 	MOVV src(0*8),y0; \
 	MOVV src(1*8),t4; \
@@ -1435,10 +1437,11 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	MOVV	hsqr(1*8), x1  
 	MOVV	hsqr(2*8), x2  
 	MOVV	hsqr(3*8), x3  
-	MOVV	x1in(0*8), y0  
-	MOVV	x1in(1*8), y1  
+	MOVV	x1in(0*8), y0
+	MOVV	x1in(1*8), t4
 	MOVV	x1in(2*8), y2  
 	MOVV	x1in(3*8), y3  
+	MOVV	t4, y1
 	CALL	p256MulInternal<>(SB)    // u1' = x1 * hsqr  
 	STy(hv)                          // 覆盖存栈 h  
 	RELOAD_PTRS  
