@@ -188,7 +188,7 @@ TEXT ·p256Select(SB),NOSPLIT,$0
         MOVV    $12, x1
 
 p256Select_limb:
-        MOVV    $0, t1
+        MOVV    $1, t1
         MOVV    a_ptr, t5
         MOVV    $0, t6
 
@@ -238,7 +238,7 @@ TEXT ·p256SelectAffine(SB),NOSPLIT,$0
 	MOVV	$32, x3
 
 p256SelectAffine_limb:
-        MOVV    $0, t1
+        MOVV    $1, t1
         MOVV    a_ptr, t5
         MOVV    $0, t6
 
