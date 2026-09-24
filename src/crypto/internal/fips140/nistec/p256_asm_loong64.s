@@ -1391,10 +1391,10 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
   
 	// Save the selected z3 before loading the next temporary.
 	MOVV	res+0(FP), t0
-	MOVV	y0, 4*8(t0)
-	MOVV	y1, 5*8(t0)
-	MOVV	y2, 6*8(t0)
-	MOVV	y3, 7*8(t0)
+	MOVV	y0, 8*8(t0)
+	MOVV	y1, 9*8(t0)
+	MOVV	y2, 10*8(t0)
+	MOVV	y3, 11*8(t0)
 
 	LDy(z1sqr)  
 	CALL	p256MulInternal<>(SB)    // z1^3  
