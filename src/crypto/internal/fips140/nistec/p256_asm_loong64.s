@@ -905,7 +905,7 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     MULV    y2, x2, t0
     ADDV    t0, acc4, acc4
     SGTU    t0, acc4, t5
-    MULHVU  y2, x2, acc5
+    MULHVU  y2, x2, t6
     ADDV    t5, acc5, acc5
 
     MULV    y2, x3, t0
@@ -927,6 +927,11 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     ADDV    t1, acc4, acc4
     SGTU    t1, acc4, t1
     OR      t3, t1, t1
+    ADDV    t6, acc5, acc5
+    SGTU    t6,acc5, t6
+    ADDV    t1, acc5, acc5
+    SGTU    t1, acc5, t1
+    OR      t6, t1, t1
     ADDV    t1, acc6, acc6
 
     // ---- 第三次约简 ----
@@ -964,7 +969,7 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     MULV    y3, x2, t0
     ADDV    t0, acc5, acc5
     SGTU    t0, acc5, t5
-    MULHVU  y3, x2, acc6
+    MULHVU  y3, x2, t6
     ADDV    t5, acc6, acc6
 
     MULV    y3, x3, t0
@@ -986,6 +991,11 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     ADDV    t1, acc5, acc5
     SGTU    t1, acc5, t1
     OR      t3, t1, t1
+    ADDV    t6, acc6, acc6
+    SGTU    t6, acc6, t6
+    ADDV    t1, acc6, acc6
+    SGTU    t1, acc6, t1
+    OR      t6, t1, t1
     ADDV    t1, acc7, acc7
 
     // ---- 第四次约简 ----
