@@ -74,7 +74,7 @@ TEXT ·p256MovCond(SB),NOSPLIT,$0
         MOVV    cond+24(FP), t0
 
         // mask = -(cond != 0)
-        SGTU    R0, t0, t1
+        SGTU    t0, R0, t1
         SUBV    t1, R0, t1
 
         // Select each limb as:
@@ -106,7 +106,7 @@ TEXT ·p256NegCond(SB),NOSPLIT,$0
         MOVV    cond+8(FP), t0
 
         // mask = -(cond != 0)
-        SGTU    R0, t0, acc4
+        SGTU    t0, R0, acc4
         SUBV    acc4, R0, acc4
 
         // acc = poly
