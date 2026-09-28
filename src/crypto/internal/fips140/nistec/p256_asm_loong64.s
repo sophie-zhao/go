@@ -843,33 +843,54 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     MULV    y1, x1, t0
     ADDV    t0, acc2, acc2
     SGTU    t0, acc2, t3
+    ADDV    t1, acc2, acc2
+    SGTU    t1, acc2, t1
+    OR      t3, t1, t1
     MULHVU  y1, x1, t4
 
     MULV    y1, x2, t0
     ADDV    t0, acc3, acc3
     SGTU    t0, acc3, t5
-    MULHVU  y1, x2, acc4
-    ADDV    t5, acc4, acc4
+    ADDV    t1, acc3, acc3
+    SGTU    t1, acc3, t1
+    OR      t5, t1, t1
+    MULHVU  y1, x2, t6
 
     MULV    y1, x3, t0
     ADDV    t0, acc4, acc4
     SGTU    t0, acc4, t5
-    MULHVU  y1, x3, acc5
-    ADDV    t5, acc5, acc5
+    ADDV    t1, acc4, acc4
+    SGTU    t1, acc4, t1
+    OR      t5, t1, t1
 
+    // carry from the low-half chain is the carry-in for the high-half chain.
+    // acc5 is otherwise unused at this point.
+    MOVV    t1, acc5
+    MULHVU  y1, x3, t0
+
+    // acc2 += high(y1*x0) + carry
     ADDV    t2, acc2, acc2
-    SGTU    t2, acc2, t2
+    SGTU    t2, acc2, t3
     ADDV    t1, acc2, acc2
     SGTU    t1, acc2, t1
-    OR      t2, t1, t1
+    OR      t3, t1, t1
+
+    // acc3 += high(y1*x1) + carry
     ADDV    t4, acc3, acc3
-    SGTU    t4, acc3, t4
-    ADDV    t3, acc3, acc3
-    SGTU    t3, acc3, t3
-    OR      t4, t3, t3
+    SGTU    t4, acc3, t3
     ADDV    t1, acc3, acc3
     SGTU    t1, acc3, t1
     OR      t3, t1, t1
+
+    // acc4 += high(y1*x2) + carry
+    ADDV    t6, acc4, acc4
+    SGTU    t6, acc4, t3
+    ADDV    t1, acc4, acc4
+    SGTU    t1, acc4, t1
+    OR      t3, t1, t1
+
+    // acc5 = carry from low chain + high(y1*x3) + carry
+    ADDV    t0, acc5, acc5
     ADDV    t1, acc5, acc5
 
     // ---- 第二次约简 ----
@@ -904,36 +925,54 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     SGTU    t0, acc3, t3
     MULHVU  y2, x1, t4
 
+    ADDV    t1, acc3, acc3
+    SGTU    t1, acc3, t1
+    OR      t3, t1, t1
+
     MULV    y2, x2, t0
     ADDV    t0, acc4, acc4
     SGTU    t0, acc4, t5
+    ADDV    t1, acc4, acc4
+    SGTU    t1, acc4, t1
+    OR      t5, t1, t1
     MULHVU  y2, x2, t6
-    ADDV    t5, acc5, acc5
 
     MULV    y2, x3, t0
     ADDV    t0, acc5, acc5
     SGTU    t0, acc5, t5
-    MULHVU  y2, x3, acc6
-    ADDV    t5, acc6, acc6
+    
+    ADDV    t1, acc5, acc5
+    SGTU    t1, acc5, t1
+    OR      t5, t1, t1
 
+    // acc6 is otherwise unused at this point; initialize it with
+    // the carry from the low-half chain.
+    MOVV    t1, acc6
+    MULHVU  y2, x3, t0
+
+    // acc3 += high(y2*x0) + carry
     ADDV    t2, acc3, acc3
-    SGTU    t2, acc3, t2
+    SGTU    t2, acc3, t3
     ADDV    t1, acc3, acc3
     SGTU    t1, acc3, t1
-    OR      t2, t1, t1
+    OR      t3, t1, t1
+
+    // acc4 += high(y2*x1) + carry
     ADDV    t4, acc4, acc4
-    SGTU    t4, acc4, t4
-    ADDV    t3, acc4, acc4
-    SGTU    t3, acc4, t3
-    OR      t4, t3, t3
+    SGTU    t4, acc4, t3
     ADDV    t1, acc4, acc4
     SGTU    t1, acc4, t1
     OR      t3, t1, t1
+
+    // acc5 += high(y2*x2) + carry
     ADDV    t6, acc5, acc5
-    SGTU    t6,acc5, t6
+    SGTU    t6, acc5, t3
     ADDV    t1, acc5, acc5
     SGTU    t1, acc5, t1
-    OR      t6, t1, t1
+    OR      t3, t1, t1
+
+    // acc6 = carry from low chain + high(y2*x3) + carry
+    ADDV    t0, acc6, acc6
     ADDV    t1, acc6, acc6
 
     // ---- 第三次约简 ----
@@ -968,36 +1007,54 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     SGTU    t0, acc4, t3
     MULHVU  y3, x1, t4
 
+    ADDV    t1, acc4, acc4
+    SGTU    t1, acc4, t1
+    OR      t3, t1, t1
+
     MULV    y3, x2, t0
     ADDV    t0, acc5, acc5
     SGTU    t0, acc5, t5
+    ADDV    t1, acc5, acc5
+    SGTU    t1, acc5, t1
+    OR      t5, t1, t1
     MULHVU  y3, x2, t6
-    ADDV    t5, acc6, acc6
 
     MULV    y3, x3, t0
     ADDV    t0, acc6, acc6
     SGTU    t0, acc6, t5
-    MULHVU  y3, x3, acc7
-    ADDV    t5, acc7, acc7
 
+    ADDV    t1, acc6, acc6
+    SGTU    t1, acc6, t1
+    OR      t5, t1, t1
+
+    // acc7 is otherwise unused at this point; initialize it with
+    // the carry from the low-half chain.
+    MOVV    t1, acc7
+    MULHVU  y3, x3, t0
+
+    // acc4 += high(y3*x0) + carry
     ADDV    t2, acc4, acc4
-    SGTU    t2, acc4, t2
+    SGTU    t2, acc4, t3
     ADDV    t1, acc4, acc4
     SGTU    t1, acc4, t1
-    OR      t2, t1, t1
+    OR      t3, t1, t1
+
+    // acc5 += high(y3*x1) + carry
     ADDV    t4, acc5, acc5
-    SGTU    t4, acc5, t4
-    ADDV    t3, acc5, acc5
-    SGTU    t3, acc5, t3
-    OR      t4, t3, t3
+    SGTU    t4, acc5, t3
     ADDV    t1, acc5, acc5
     SGTU    t1, acc5, t1
     OR      t3, t1, t1
+
+    // acc6 += high(y3*x2) + carry
     ADDV    t6, acc6, acc6
-    SGTU    t6, acc6, t6
+    SGTU    t6, acc6, t3
     ADDV    t1, acc6, acc6
     SGTU    t1, acc6, t1
-    OR      t6, t1, t1
+    OR      t3, t1, t1
+
+    // acc7 = carry from low chain + high(y3*x3) + carry
+    ADDV    t0, acc7, acc7
     ADDV    t1, acc7, acc7
 
     // ---- 第四次约简 ----
