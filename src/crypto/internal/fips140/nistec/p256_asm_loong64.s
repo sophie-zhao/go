@@ -64,6 +64,8 @@ GLOBL p256ordK0<>(SB), 8, $8
 GLOBL p256ord<>(SB), 8, $32
 GLOBL p256one<>(SB), 8, $32
 
+GLOBL ·p256MulDebug(SB), NOPTR, $40
+
 /* ---------------------------------------*/
 // func p256MovCond(res, a, b *P256Point, cond int)
 // If cond is 0, sets res = b, otherwise sets res = a.
@@ -1042,6 +1044,16 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
 
     MOVV    t0, acc4            // 最终溢出标志 (0 或 1)
 
+    // DEBUG: save acc0..acc4 immediately before conditional subtraction.
+    // p256MulDebug[0..3] = 256-bit accumulator.
+    // p256MulDebug[4]    = final overflow bit.
+    MOVV    $·p256MulDebug(SB), t6
+    MOVV    acc0, 0(t6)
+    MOVV    acc1, 8(t6)
+    MOVV    acc2, 16(t6)
+    MOVV    acc3, 24(t6)
+    MOVV    acc4, 32(t6)
+
     // ==================== 条件减法 p（使用位掩码选择） ====================
     // 计算借位
     MOVV    $-1, t6
@@ -1087,23 +1099,31 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     // 选择：若借位为0（无借位，acc >= p）取减后值 t0..t3
     //       若借位为1（有借位，acc < p）取原值 acc0..acc3
     AND     t6, t0, t4
-    AND     t5, acc0, t5
-    OR      t4, t5, y0
+    AND     t5, acc0, acc4
+    OR      t4, acc4, y0
 
     AND     t6, t1, t4
-    AND     t5, acc1, t5
-    OR      t4, t5, y1
+    AND     t5, acc1, acc4
+    OR      t4, acc4, y1
 
     AND     t6, t2, t4
-    AND     t5, acc2, t5
-    OR      t4, t5, y2
+    AND     t5, acc2, acc4
+    OR      t4, acc4, y2
 
     AND     t6, t3, t4
-    AND     t5, acc3, t5
-    OR      t4, t5, y3
+    AND     t5, acc3, acc4
+    OR      t4, acc4, y3
 
     RET
 
+// func p256MulDebugRead() *[5]uint64
+//
+// Debug helper: read the accumulator captured immediately before
+// the conditional subtraction in p256MulInternal.
+TEXT ·p256MulDebugRead(SB),NOSPLIT,$0-8
+    MOVV    $·p256MulDebug(SB), t6
+    MOVV    t6, ret+0(FP)
+    RET
 
 // func p256Mul(res, in1, in2 *p256Element)  
 TEXT ·p256Mul(SB),NOSPLIT,$0 
