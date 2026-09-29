@@ -894,14 +894,14 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
 
     // acc3 += high(y1*x1) + high-half carry
     ADDV    t4, acc3, acc3
-    SGTU    t4, acc3, t3
+    SGTU    t4, acc3, t5
     ADDV    t3, acc3, acc3
     SGTU    t3, acc3, t1
     OR      t5, t1, t3
 
     // acc4 += high(y1*x2) + high-half carry
     ADDV    t6, acc4, acc4
-    SGTU    t6, acc4, t3
+    SGTU    t6, acc4, t5
     ADDV    t3, acc4, acc4
     SGTU    t3, acc4, t1
     OR      t5, t1, t3
@@ -987,14 +987,14 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
 
     // acc4 += high(y2*x1) + high-half carry
     ADDV    t4, acc4, acc4
-    SGTU    t4, acc4, t3
+    SGTU    t4, acc4, t5
     ADDV    t3, acc4, acc4
     SGTU    t3, acc4, t1
     OR      t5, t1, t3
 
     // acc5 += high(y2*x2) + high-half carry
     ADDV    t6, acc5, acc5
-    SGTU    t6, acc5, t3
+    SGTU    t6, acc5, t5
     ADDV    t3, acc5, acc5
     SGTU    t3, acc5, t1
     OR      t5, t1, t3
@@ -1080,14 +1080,14 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
 
     // acc5 += high(y3*x1) + high-half carry
     ADDV    t4, acc5, acc5
-    SGTU    t4, acc5, t3
+    SGTU    t4, acc5, t5
     ADDV    t3, acc5, acc5
     SGTU    t3, acc5, t1
     OR      t5, t1, t3
 
     // acc6 += high(y3*x2) + high-half carry
     ADDV    t6, acc6, acc6
-    SGTU    t6, acc6, t3
+    SGTU    t6, acc6, t5
     ADDV    t3, acc6, acc6
     SGTU    t3, acc6, t1
     OR      t5, t1, t3
