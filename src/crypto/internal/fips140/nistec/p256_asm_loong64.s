@@ -1709,9 +1709,6 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 #define tmpv(off)  (8 + 32*4 + off)(R3)  
 #define y3tmp(off) (8 + 32*5 + off)(R3)  
   
-#define RELOAD_A \  
-	MOVV	in+8(FP), a_ptr
-  
 // ---- 模P半减：y0..y3 = (y0..y3) / 2 mod P ----  
 // 若为偶数直接右移1位；若为奇数先加P再右移1位  
 #define p256HalveInline \  
@@ -1824,7 +1821,7 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	LDx(z1in)  
 	CALL	p256SqrInternal<>(SB)  
 	STy(zsqrv)  
-	RELOAD_A  
+	MOVV	in+8(FP), a_ptr
   
 	// m_pre = X1 + zsqr  (x = X1, y = zsqr)  
 	LDx(x1in)  
@@ -1836,7 +1833,7 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	LDx(z1in)  
 	LDy(y1in)  
 	CALL	p256MulInternal<>(SB)  
-	RELOAD_A  
+	MOVV	in+8(FP), a_ptr
 	MOVV	y0, x0  
 	MOVV	y1, x1  
 	MOVV	y2, x2  
@@ -1848,7 +1845,7 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	LDy(x1in)  
 	LDx(zsqrv)  
 	CALL	p256SubInternal<>(SB)  
-	RELOAD_A  
+	MOVV	in+8(FP), a_ptr
   
 	// h2 = h * m_pre  
 	MOVV	x0, y0  
@@ -1857,7 +1854,7 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	MOVV	x3, y3  
 	LDx(mv)  
 	CALL	p256MulInternal<>(SB)  
-	RELOAD_A  
+	MOVV	in+8(FP), a_ptr
 	STy(h2v)                    // 关键修正：先保存一份原始 h2，避免被下面的 MulBy2 覆盖丢失  
   
 	// M = 3*h2 = 2*h2 + h2  
@@ -1882,7 +1879,7 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	MOVV	x2, y2  
 	MOVV	x3, y3  
 	CALL	p256SqrInternal<>(SB) // y0..y3 = (2*Y1)^2 = s  
-	RELOAD_A  
+	MOVV	in+8(FP), a_ptr
 	STy(sv)  
   
 	// yyyy = s^2 = 16*Y1^4  
@@ -1891,7 +1888,7 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	MOVV	y2, x2  
 	MOVV	y3, x3  
 	CALL	p256SqrInternal<>(SB) // y0..y3 = s^2 = 16*Y1^4  
-	RELOAD_A  
+	MOVV	in+8(FP), a_ptr
   
 	// 8*Y1^4 = yyyy / 2 (mod P halving)  
 	p256HalveInline               // y0..y3 = yyyy/2  
@@ -1901,7 +1898,7 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	LDx(x1in)  
 	LDy(sv)  
 	CALL	p256MulInternal<>(SB)  
-	RELOAD_A  
+	MOVV	in+8(FP), a_ptr
 	STy(sv)                       // 覆盖存回 s = S  
   
 	// 2S = 8*X1*Y1^2  
@@ -1919,18 +1916,18 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	MOVV	x2, y2  
 	MOVV	x3, y3  
 	CALL	p256SqrInternal<>(SB) // y0..y3 = M^2  
-	RELOAD_A  
+	MOVV	in+8(FP), a_ptr
   
 	// X3 = Msqr - 2S  (diff = y - x, y = Msqr, x = 2S)  
 	LDx(tmpv)  
 	CALL	p256SubInternal<>(SB)  
-	RELOAD_A  
+	MOVV	in+8(FP), a_ptr
 	STx(x3out)                    // 写 res.x  
   
 	// S - X3  (diff = y - x, y = S, x = X3)  
 	LDy(sv)  
 	CALL	p256SubInternal<>(SB)  
-	RELOAD_A  
+	MOVV	in+8(FP), a_ptr
   
 	// M * (S - X3)  
 	MOVV	x0, y0  
@@ -1939,13 +1936,13 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	MOVV	x3, y3  
 	LDx(mv)  
 	CALL	p256MulInternal<>(SB)  
-	RELOAD_A  
+	MOVV	in+8(FP), a_ptr
   
 	// Y3 = M*(S-X3) - 8*Y1^4  (diff = y - x, y = 上一步结果, x = y3tmp)  
 	MOVV	y0, y0  
 	LDx(y3tmp)  
 	CALL	p256SubInternal<>(SB)  
-	RELOAD_A  
+	MOVV	in+8(FP), a_ptr
 	STx(y3out)                    // 写 res.y  
   
 	RET
