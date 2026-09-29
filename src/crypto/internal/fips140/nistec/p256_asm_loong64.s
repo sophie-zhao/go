@@ -1395,7 +1395,7 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 	MOVV	in2+16(FP), b_ptr
 
 // func p256PointAddAffineAsm(res, in1 *P256Point, in2 *p256AffinePoint, sign, sel, zero int)  
-TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48  
+TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	// sign/sel/zero 不能借用 hlp0(=b_ptr)/y1(=a_ptr)，先用 t5/t6 承接  
 	MOVV	sign+24(FP), t5      // t5 = sign  
 	MOVV	sel+32(FP), t6       // t6 = sel  
@@ -1710,7 +1710,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 #define y3tmp(off) (8 + 32*5 + off)(R3)  
   
 #define RELOAD_A \  
-	MOVV	in1+8(FP), a_ptr  
+	MOVV	in+8(FP), a_ptr
   
 // ---- 模P半减：y0..y3 = (y0..y3) / 2 mod P ----  
 // 若为偶数直接右移1位；若为奇数先加P再右移1位  
@@ -1816,7 +1816,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$352-48
 	OR	hlp0, x3, x3
 
 // func p256PointDoubleAsm(res, in *P256Point)  
-TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$192-16  
+TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	MOVV	res+0(FP), res_ptr  
 	MOVV	in+8(FP), a_ptr  
   
