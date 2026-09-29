@@ -1911,10 +1911,6 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
   
 	// Msqr = M^2  
 	LDx(mv)  
-	MOVV	x0, y0  
-	MOVV	x1, y1  
-	MOVV	x2, y2  
-	MOVV	x3, y3  
 	CALL	p256SqrInternal<>(SB) // y0..y3 = M^2  
 	MOVV	in+8(FP), a_ptr
   
