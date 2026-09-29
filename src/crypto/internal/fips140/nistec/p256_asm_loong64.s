@@ -1289,9 +1289,9 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 	SGTU	t6, x0, t5              ;\
 	ADDV	$1, x0, t0              ;\
 	\
-	MOVV	p256const0<>(SB), t5	;\
-	SUBV	t5, x1, t1	        ;\
-	SGTU	t5, x1, t4              ;\
+	MOVV	p256const0<>(SB), t6	;\
+	SUBV	t6, x1, t1	        ;\
+	SGTU	t6, x1, t4              ;\
 	MOVV	t1, t6                  ;\
 	SUBV	t5, t1, t1              ;\
 	SGTU	t1, t6, t6              ;\
@@ -1313,7 +1313,7 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 	OR	t4, t6, t5              ;\
 	\
 	/* fold doubling-overflow bit into the borrow chain */ \
-	SUBV	t5, hlp0, hlp0          ;\
+	SUBV	hlp0, t5, hlp0          ;\
 	SRAV	$63, hlp0, t5           ;\
 	MOVV	$-1, t6                 ;\
 	XOR	t5, t6, t6              ;\
@@ -1820,6 +1820,7 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	// zsqr = Z1^2  
 	LDx(z1in)  
 	CALL	p256SqrInternal<>(SB)  
+	MOVV	in+8(FP), a_ptr
 	STy(zsqrv)  
 	MOVV	in+8(FP), a_ptr
   
@@ -1828,6 +1829,9 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	LDy(zsqrv)  
 	p256AddInline               // x0..x3 = x + y = X1 + zsqr  
 	STx(mv)                     // 先把 m_pre 存起来，后面还要复用 x1in/zsqr  
+
+	// R5(in) is caller-clobbered by previous CALLs.
+	MOVV	in+8(FP), R5 
   
 	// z3 = 2*(Y1*Z1) -> res.z  
 	LDx(z1in)  
@@ -1895,6 +1899,7 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	STy(y3tmp)                    // 暂存，后面 Y3 计算要用  
   
 	// S = X1 * s = 4*X1*Y1^2  
+	MOVV	in+8(FP), R5
 	LDx(x1in)  
 	LDy(sv)  
 	CALL	p256MulInternal<>(SB)  
