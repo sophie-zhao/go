@@ -735,9 +735,11 @@ TEXT p256SqrInternal<>(SB),NOSPLIT,$0
 	OR	t4, t5, t3  
 	SUBV	t3, acc4, acc4  
   
-	// mask: acc4==0 (no final borrow, i.e. CS set) -> select t0..t2,y0 ; else acc0..acc3  
-	SRAV    $63, acc4, t3
-	MOVV	$-1, t4  
+        // 当 acc4 == -1 (有借位) 时，t3 = 全1；当 acc4 == 0 (无借位) 时，t3 = 0
+        // 借用 R0 恒为 0 的特性，SGTU 可以安全捕捉 acc4 != 0 的状态
+	SGTU	acc4, R0, t3
+        SUBV    t3, R0, t3       // t3 为借位掩码 (0 或 全1)
+        MOVV    $-1, t4
 	XOR	t3, t4, t4  
   
 	AND	t4, t0, t5  
@@ -1201,11 +1203,12 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     // 若 acc4=0 且未借位(t5=0) -> acc4 保持 0，需要减 P
     SUBV    t5, acc4, acc4
 
-    // mask: acc4>=0（即符号位为0，表示整条链无借位）-> 选减法结果 t0..t3
-    //       acc4<0（符号位为1，表示确实小于 P）      -> 选原始 acc0..acc3
-    SRAV    $63, acc4, t5
+    // 当 acc4 != 0 (说明发生了借位/小于P)，我们要保留原始值 acc0..acc3
+    // 当 acc4 == 0 (说明没有借位/大于等于P)，我们要选择减法结果 t0..t3
+    SGTU    acc4, R0, t5
+    SUBV    t5, R0, t5          // t5 = 借位掩码：有借位时全1(选原值)，无借位时0
     MOVV    $-1, t6
-    XOR     t5, t6, t6          // t6 = ~t5  
+    XOR     t5, t6, t6          // t6 = 无借位掩码：有借位时0，无借位时全1
 
     // 选择：若借位为0（无借位，acc >= p）取减后值 t0..t3
     //       若借位为1（有借位，acc < p）取原值 acc0..acc3
