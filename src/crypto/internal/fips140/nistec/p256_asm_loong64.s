@@ -64,8 +64,6 @@ GLOBL p256ordK0<>(SB), 8, $8
 GLOBL p256ord<>(SB), 8, $32
 GLOBL p256one<>(SB), 8, $32
 
-GLOBL ·p256MulDebug(SB), NOPTR, $320
-
 /* ---------------------------------------*/
 // func p256MovCond(res, a, b *P256Point, cond int)
 // If cond is 0, sets res = b, otherwise sets res = a.
@@ -844,18 +842,6 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     OR      t4, t3, t3
     ADDV    t3, acc4, acc4
 
-    // DEBUG checkpoint #1: after Montgomery reduction #1.
-    // Save the complete accumulator, including the unreduced high limbs.
-    MOVV    $·p256MulDebug(SB), t6
-    MOVV    acc0, 0(t6)
-    MOVV    acc1, 8(t6)
-    MOVV    acc2, 16(t6)
-    MOVV    acc3, 24(t6)
-    MOVV    acc4, 32(t6)
-    MOVV    acc5, 40(t6)
-    MOVV    acc6, 48(t6)
-    MOVV    acc7, 56(t6)
-
     // ==================== y1 * x ====================
     MULV    y1, x0, t0
     ADDV    t0, acc1, acc1
@@ -935,17 +921,6 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     SGTU    t3, acc0, t3
     OR      t4, t3, t3
     ADDV    t3, acc1, acc1
-
-    // DEBUG checkpoint #2: after Montgomery reduction #2.
-    MOVV    $·p256MulDebug(SB), t6
-    MOVV    acc0, 64(t6)
-    MOVV    acc1, 72(t6)
-    MOVV    acc2, 80(t6)
-    MOVV    acc3, 88(t6)
-    MOVV    acc4, 96(t6)
-    MOVV    acc5, 104(t6)
-    MOVV    acc6, 112(t6)
-    MOVV    acc7, 120(t6)
 
     // ==================== y2 * x ====================
     MULV    y2, x0, t0
@@ -1028,17 +1003,6 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     SGTU    t3, acc1, t3
     OR      t4, t3, t3
     ADDV    t3, acc2, acc2
-
-    // DEBUG checkpoint #3: after Montgomery reduction #3.
-    MOVV    $·p256MulDebug(SB), t6
-    MOVV    acc0, 128(t6)
-    MOVV    acc1, 136(t6)
-    MOVV    acc2, 144(t6)
-    MOVV    acc3, 152(t6)
-    MOVV    acc4, 160(t6)
-    MOVV    acc5, 168(t6)
-    MOVV    acc6, 176(t6)
-    MOVV    acc7, 184(t6)
 
     // ==================== y3 * x ====================
     MULV    y3, x0, t0
@@ -1123,17 +1087,6 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     OR      t4, t3, t3
     ADDV    t3, acc3, acc3
 
-    // DEBUG checkpoint #4: after Montgomery reduction #4.
-    MOVV    $·p256MulDebug(SB), t6
-    MOVV    acc0, 192(t6)
-    MOVV    acc1, 200(t6)
-    MOVV    acc2, 208(t6)
-    MOVV    acc3, 216(t6)
-    MOVV    acc4, 224(t6)
-    MOVV    acc5, 232(t6)
-    MOVV    acc6, 240(t6)
-    MOVV    acc7, 248(t6)
-
     // ==================== 合并高位 [511:256] ====================
     ADDV    acc4, acc0, acc0
     SGTU    acc4, acc0, t0
@@ -1156,16 +1109,6 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     OR      t1, t0, t0
 
     MOVV    t0, acc4            // 最终溢出标志 (0 或 1)
-
-    // DEBUG: save final accumulator immediately before conditionalsubtraction. 
-    // p256MulDebug[32..35] = acc0..acc3
-    // p256MulDebug[36]    = final overflow bit.
-    MOVV    $·p256MulDebug(SB), t6
-    MOVV    acc0, 256(t6)
-    MOVV    acc1, 264(t6)
-    MOVV    acc2, 272(t6)
-    MOVV    acc3, 280(t6)
-    MOVV    acc4, 288(t6)
 
     // ==================== 条件减法 p（使用位掩码选择） ====================
     // 计算借位
@@ -1228,15 +1171,6 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     AND     t5, acc3, acc4
     OR      t4, acc4, y3
 
-    RET
-
-// func p256MulDebugRead() *[5]uint64
-//
-// Debug helper: read the accumulator captured immediately before
-// the conditional subtraction in p256MulInternal.
-TEXT ·p256MulDebugRead(SB),NOSPLIT,$0-8
-    MOVV    $·p256MulDebug(SB), t6
-    MOVV    t6, ret+0(FP)
     RET
 
 // func p256Mul(res, in1, in2 *p256Element)  
