@@ -58,11 +58,11 @@ DATA p256one<>+0x00(SB)/8, $0x0000000000000001
 DATA p256one<>+0x08(SB)/8, $0xffffffff00000000
 DATA p256one<>+0x10(SB)/8, $0xffffffffffffffff
 DATA p256one<>+0x18(SB)/8, $0x00000000fffffffe
-GLOBL p256const0<>(SB), 8, $8
-GLOBL p256const1<>(SB), 8, $8
-GLOBL p256ordK0<>(SB), 8, $8
-GLOBL p256ord<>(SB), 8, $32
-GLOBL p256one<>(SB), 8, $32
+GLOBL p256const0<>(SB), (NOPTR|RODATA), $8
+GLOBL p256const1<>(SB), (NOPTR|RODATA), $8
+GLOBL p256ordK0<>(SB), (NOPTR|RODATA), $8
+GLOBL p256ord<>(SB), (NOPTR|RODATA), $32
+GLOBL p256one<>(SB), (NOPTR|RODATA), $32
 
 /* ---------------------------------------*/
 // func p256MovCond(res, a, b *P256Point, cond int)
@@ -185,7 +185,8 @@ TEXT ·p256Select(SB),NOSPLIT,$0
         // Process all 12 limbs. For every limb, scan all 16 entries.
         // Both loop counts are fixed and independent of idx.
         MOVV    $0, x0
-        MOVV    $12, x1
+	MOVV    $12, x1		// limb count  
+	MOVV    $17, x3		// entry bound: i runs 1..16 (16 entries) 
 
 p256Select_limb:
         MOVV    $1, t1
@@ -207,7 +208,7 @@ p256Select_entry:
 
         ADDV    $96, t5, t5
         ADDV    $1, t1, t1
-        BNE     t1, x1, p256Select_entry
+	BNE     t1, x3, p256Select_entry
 
         MOVV    t6, (res_ptr)
         ADDV    $8, a_ptr, a_ptr
@@ -235,7 +236,7 @@ TEXT ·p256SelectAffine(SB),NOSPLIT,$0
         // The loop counts are fixed and independent of idx.
         MOVV    $0, x0
         MOVV    $8, x1
-	MOVV	$32, x3
+	MOVV    $33, x3		// entry bound: i runs 1..32 (32 entries)
 
 p256SelectAffine_limb:
         MOVV    $1, t1
@@ -425,7 +426,8 @@ TEXT ·p256FromMont(SB),NOSPLIT,$0-16
 // input:  x0-x3, y0-y3  
 // output: x0-x3 = (y0-y3) - (x0-x3) mod p256P  
 // uses:   const0(p256const0<>), const1(p256const1<>)  
-// clobbers: y0-y3, acc0-acc7, t0-t3  
+// clobbers: x0-x3 (overwritten with the result), y0-y3, acc0-acc7,
+//           t0-t3
 TEXT p256SubInternal<>(SB),NOSPLIT,$0  
 	// ---- diff = y - x，借位链累积在 t0 ----  
 	SUBV	x0, y0, acc0  
@@ -493,9 +495,10 @@ TEXT p256SubInternal<>(SB),NOSPLIT,$0
   
 	RET
 
-// p256SqrInternal computes acc0..acc3 = x0..x3 * x0..x3 mod P (Montgomery domain).  
-// Clobbers t0-t6, acc0-acc7. Result left in acc0-acc3 (mirrors ARM64's y0-y3 output  
-// convention is NOT followed here -- see note below).  
+// p256SqrInternal computes y0..y3 = x0..x3 * x0..x3 mod P (Montgomery domain).
+// Result left in y0-y3, matching the arm64 output convention.
+// Clobbers t0-t6, acc0-acc7, y0-y3, and hlp0 (b_ptr/R6) -- callers must
+// not keep live state in b_ptr across the CALL.
 TEXT p256SqrInternal<>(SB),NOSPLIT,$0  
 	// ---- x[1:] * x[0] ----  
 	MULV	x0, x1, acc1  
@@ -563,7 +566,6 @@ TEXT p256SqrInternal<>(SB),NOSPLIT,$0
 	OR	t5, t4, t4  
 	SLLV	$1, acc1, t5  
 	SRLV	$63, acc6, acc7	// top carry-out of the double (from old acc6's high bit)  
-	ADDV	acc7, R0, acc7  
 	MOVV	t5, acc1  
 	MOVV	t4, acc2  
 	MOVV	t3, acc3  
@@ -763,11 +765,14 @@ TEXT p256SqrInternal<>(SB),NOSPLIT,$0
   
 	RET
 
-// func p256Sqr(res, in *p256Element, n int)
-TEXT ·p256Sqr(SB),NOSPLIT,$0
+// Non-leaf: saves R1 and keeps n on the stack, because
+// p256SqrInternal clobbers both R1 (CALL) and b_ptr (hlp0).
+TEXT ·p256Sqr(SB),NOSPLIT,$16-24
+	MOVV    R1, 8(R3)               // save return address
 	MOVV	res+0(FP), res_ptr
 	MOVV	in+8(FP), a_ptr
-	MOVV	n+16(FP), b_ptr
+	MOVV    n+16(FP), t0  
+	MOVV    t0, 16(R3)              // spill n (b_ptr is clobbered by callee)
 
 	MOVV	0*8(a_ptr), x0
 	MOVV	1*8(a_ptr), x1
@@ -775,18 +780,22 @@ TEXT ·p256Sqr(SB),NOSPLIT,$0
 	MOVV	3*8(a_ptr), x3
 
 sqrLoop:
-	SUBV	$1, b_ptr, b_ptr
+	MOVV    16(R3), t0  
+	SUBV    $1, t0, t0  
+	MOVV    t0, 16(R3)
 	CALL	p256SqrInternal<>(SB)
 	MOVV	y0, x0
 	MOVV	y1, x1
 	MOVV	y2, x2
 	MOVV	y3, x3
-	BNE	b_ptr, R0, sqrLoop
+	MOVV    16(R3), t0              // reload n; t0 was clobbered by callee
+	BNE     t0, R0, sqrLoop         // t0 survives: callee doesn't write t0? -- see note
 
 	MOVV	y0, 0*8(res_ptr)
 	MOVV	y1, 1*8(res_ptr)
 	MOVV	y2, 2*8(res_ptr)
 	MOVV	y3, 3*8(res_ptr)
+	MOVV    8(R3), R1               // restore return address
 	RET
 
 
@@ -840,7 +849,7 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     ADDV    t3, acc3, acc3
     SGTU    t3, acc3, t3
     OR      t4, t3, t3
-    ADDV    t3, acc4, acc4
+    ADDV    t3, acc0, acc0		// acc0 = hi + carry: new pos-4 window lim
 
     // ==================== y1 * x ====================
     MULV    y1, x0, t0
@@ -1174,7 +1183,8 @@ TEXT p256MulInternal<>(SB),NOSPLIT,$0
     RET
 
 // func p256Mul(res, in1, in2 *p256Element)  
-TEXT ·p256Mul(SB),NOSPLIT,$0 
+TEXT ·p256Mul(SB),NOSPLIT,$16-24
+	MOVV	R1, 8(R3)		// save return address
 	MOVV	res+0(FP), res_ptr  
 	MOVV	in1+8(FP), a_ptr  
 	MOVV	in2+16(FP), b_ptr  
@@ -1195,6 +1205,7 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 	MOVV	y1, 1*8(res_ptr)  
 	MOVV	y2, 2*8(res_ptr)  
 	MOVV	y3, 3*8(res_ptr)  
+	MOVV	8(R3), R1		// restore return address
 	RET
 
 /* ---------------------------------------*/  
@@ -1231,14 +1242,14 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 	SGTU	t6, x1, t4              ;\
 	MOVV	t1, t6                  ;\
 	SUBV	t5, t1, t1              ;\
-	SGTU	t1, t6, t6              ;\
+	SGTU	t5, t6, t6              ;\  /* second borrow: raw < borrow_in */
 	OR	t4, t6, t5              ;\
 	\
 	SUBV	$0, x2, t2              ;\
 	SGTU	$0, x2, t4              ;\
 	MOVV	t2, t6                  ;\
 	SUBV	t5, t2, t2              ;\
-	SGTU	t2, t6, t6              ;\
+	SGTU	t5, t6, t6              ;\
 	OR	t4, t6, t5              ;\
 	\
 	MOVV	p256const1<>(SB), t6	;\
@@ -1246,11 +1257,11 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 	SGTU	t6, x3, t4              ;\
 	MOVV	t3, t6                  ;\
 	SUBV	t5, t3, t3              ;\
-	SGTU	t3, t6, t6              ;\
+	SGTU	t5, t6, t6              ;\
 	OR	t4, t6, t5              ;\
 	\
 	/* fold doubling-overflow bit into the borrow chain */ \
-	SUBV	hlp0, t5, hlp0          ;\
+	SUBV    t5, hlp0, hlp0          ;\  /* hlp0 = ovf - borrow (arm64 SBCS) */
 	SRAV	$63, hlp0, t5           ;\
 	MOVV	$-1, t6                 ;\
 	XOR	t5, t6, t6              ;\
@@ -1333,6 +1344,7 @@ TEXT ·p256Mul(SB),NOSPLIT,$0
 
 // func p256PointAddAffineAsm(res, in1 *P256Point, in2 *p256AffinePoint, sign, sel, zero int)  
 TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
+	MOVV    R1, (8+32*9)(R3)    // save return address across CALLs
 	// sign/sel/zero 不能借用 hlp0(=b_ptr)/y1(=a_ptr)，先用 t5/t6 承接  
 	MOVV	sign+24(FP), t5      // t5 = sign  
 	MOVV	sel+32(FP), t6       // t6 = sel  
@@ -1342,7 +1354,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	SGTU	t6, R0, t2           // t2 = (sel != 0) ? 1 : 0  
 	SGTU	t0, R0, t3           // t3 = (zero != 0) ? 1 : 0  
 	SLLV	$1, t3, t3  
-	XOR	t2, t3, t1           // t1 = sel_norm ^ (zero_norm<<1)，后续用它做位测试  
+	OR	t2, t3, t1           // t1 = sel_norm ^ (zero_norm<<1)，后续用它做位测试  
 	MOVV    t1, selflag(0)       // 立即存回栈，不依赖寄存器跨越多次CALL存活
   
 	// sign 规整为 0/1，存入 t4（供后面条件选择使用）  
@@ -1522,9 +1534,9 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	MOVV	t4, y1
 	CALL	p256MulInternal<>(SB)    // u1' = x1 * hsqr  
 	STy(hv)                          // 覆盖存栈 h  
-	RELOAD_PTRS  
-  
-	p256MulBy2Inline                 // u1'2 = 2*u1' (x0..x3 -> 已在寄存器中)  
+	// NOTE: MulBy2Inline reads y1 which aliases a_ptr; it must run
+	// BEFORE RELOAD_PTRS. LDy(rsqr) only needs the stack pointer.
+	p256MulBy2Inline                 // u1'2 = 2*u1' (y regs still hold u1')
   
 	LDy(rsqr)  
 	CALL	p256SubInternal<>(SB)    // rsqr - u1'2  
@@ -1552,7 +1564,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	AND	t2, x0, x0; AND t3, acc0, acc0; OR x0, acc0, x0  
 	AND	t2, x1, x1; AND t3, acc1, acc1; OR x1, acc1, x1  
 	AND	t2, x2, x2; AND t3, acc2, acc2; OR x2, acc2, x2  
-	AND	t2, x3, x3; AND t3, acc3, acc3; OR x3, acc3, x3  
+	AND	t2, x3, x3; AND t3, acc3, acc3; OR x3, acc3, x3
   
 	MOVV	x2in(0*8), acc0  
 	MOVV	x2in(1*8), acc1  
@@ -1564,10 +1576,10 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	NEGV	t2, t2  
 	MOVV	$-1, t3  
 	XOR	t2, t3, t3  
-	AND	t2, x0, x0; AND t3, acc0, acc0; OR x0, acc0, x0  
-	AND	t2, x1, x1; AND t3, acc1, acc1; OR x1, acc1, x1  
-	AND	t2, x2, x2; AND t3, acc2, acc2; OR x2, acc2, x2  
-	AND	t2, x3, x3; AND t3, acc3, acc3; OR x3, acc3, x3  
+	AND     t2, x0, x0; AND t3, acc0, acc0; OR x0, acc0, x0  
+	AND     t2, x1, x1; AND t3, acc1, acc1; OR x1, acc1, x1  
+	AND     t2, x2, x2; AND t3, acc2, acc2; OR x2, acc2, x2  
+	AND     t2, x3, x3; AND t3, acc3, acc3; OR x3, acc3, x3
   
 	MOVV	res+0(FP), t0  
 	MOVV	x0, 0*8(t0)  
@@ -1612,7 +1624,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	AND	t2, x0, x0; AND t3, acc0, acc0; OR x0, acc0, x0  
 	AND	t2, x1, x1; AND t3, acc1, acc1; OR x1, acc1, x1  
 	AND	t2, x2, x2; AND t3, acc2, acc2; OR x2, acc2, x2  
-	AND	t2, x3, x3; AND t3, acc3, acc3; OR x3, acc3, x3  
+	AND	t2, x3, x3; AND t3, acc3, acc3; OR x3, acc3, x3
   
 	MOVV	y2in(0*8), acc0  
 	MOVV	y2in(1*8), acc1  
@@ -1635,6 +1647,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	MOVV	x2, 6*8(t0)  
 	MOVV	x3, 7*8(t0)  
   
+  	MOVV    (8+32*9)(R3), R1    // restore return address
 	RET
 
 // ---------------------------------------  
@@ -1750,14 +1763,14 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	OR	hlp0, x3, x3
 
 // func p256PointDoubleAsm(res, in *P256Point)  
-TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
+TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$216-16
+        MOVV    R1, (8+32*6)(R3)    // save return address; NOSPLIT => no auto-save
 	MOVV	res+0(FP), res_ptr  
 	MOVV	in+8(FP), a_ptr  
   
 	// zsqr = Z1^2  
 	LDx(z1in)  
 	CALL	p256SqrInternal<>(SB)  
-	MOVV	in+8(FP), a_ptr
 	STy(zsqrv)  
 	MOVV	in+8(FP), a_ptr
   
@@ -1774,13 +1787,9 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	LDx(z1in)  
 	LDy(y1in)  
 	CALL	p256MulInternal<>(SB)  
-	MOVV	in+8(FP), a_ptr
-	MOVV	y0, x0  
-	MOVV	y1, x1  
-	MOVV	y2, x2  
-	MOVV	y3, x3  
 	p256MulBy2Inline  
 	STx(z3out)  
+	MOVV	in+8(FP), a_ptr		// reload AFTER y consumed, BEFORE next in1 access
   
 	// h = X1 - zsqr  (p256SubInternal: diff = y - x, 故 y=X1, x=zsqr)  
 	LDy(x1in)  
@@ -1795,8 +1804,7 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	MOVV	x3, y3  
 	LDx(mv)  
 	CALL	p256MulInternal<>(SB)  
-	MOVV	in+8(FP), a_ptr
-	STy(h2v)                    // 关键修正：先保存一份原始 h2，避免被下面的 MulBy2 覆盖丢失  
+	STy(h2v)                    // save h2 before MulBy2 consumes y 
   
 	// M = 3*h2 = 2*h2 + h2  
 	MOVV	y0, x0  
@@ -1807,6 +1815,8 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	LDy(h2v)                     // y0..y3 = 原始 h2（未被覆盖）  
 	p256AddInline                // x0..x3 = 2*h2 + h2 = 3*h2 = M  
 	STx(mv)                      // 覆盖存回 m  
+	MOVV	in+8(FP), a_ptr          // reload BEFORE next in1 dereference;  
+                                   // LDy(h2v) above re-clobbered y1==a_ptr
   
 	// s = (2*Y1)^2 = 4*Y1^2  
 	LDx(y1in)  
@@ -1820,7 +1830,6 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	MOVV	x2, y2  
 	MOVV	x3, y3  
 	CALL	p256SqrInternal<>(SB) // y0..y3 = (2*Y1)^2 = s  
-	MOVV	in+8(FP), a_ptr
 	STy(sv)  
   
 	// yyyy = s^2 = 16*Y1^4  
@@ -1828,8 +1837,8 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	MOVV	y1, x1  
 	MOVV	y2, x2  
 	MOVV	y3, x3  
-	CALL	p256SqrInternal<>(SB) // y0..y3 = s^2 = 16*Y1^4  
 	MOVV	in+8(FP), a_ptr
+	CALL	p256SqrInternal<>(SB) // y0..y3 = s^2 = 16*Y1^4  
   
 	// 8*Y1^4 = yyyy / 2 (mod P halving)  
 	p256HalveInline               // y0..y3 = yyyy/2  
@@ -1840,7 +1849,6 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	LDx(x1in)  
 	LDy(sv)  
 	CALL	p256MulInternal<>(SB)  
-	MOVV	in+8(FP), a_ptr
 	STy(sv)                       // 覆盖存回 s = S  
   
 	// 2S = 8*X1*Y1^2  
@@ -1854,7 +1862,6 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	// Msqr = M^2  
 	LDx(mv)  
 	CALL	p256SqrInternal<>(SB) // y0..y3 = M^2  
-	MOVV	in+8(FP), a_ptr
   
 	// X3 = Msqr - 2S  (diff = y - x, y = Msqr, x = 2S)  
 	LDx(tmpv)  
@@ -1874,15 +1881,14 @@ TEXT ·p256PointDoubleAsm(SB),NOSPLIT,$200-16
 	MOVV	x3, y3  
 	LDx(mv)  
 	CALL	p256MulInternal<>(SB)  
-	MOVV	in+8(FP), a_ptr
   
 	// Y3 = M*(S-X3) - 8*Y1^4  (diff = y - x, y = 上一步结果, x = y3tmp)  
-	MOVV	y0, y0  
-	LDx(y3tmp)  
+	LDx(y3tmp)
 	CALL	p256SubInternal<>(SB)  
 	MOVV	in+8(FP), a_ptr
 	STx(y3out)                    // 写 res.y  
   
+	MOVV    (8+32*6)(R3), R1    // restore return address
 	RET
 
 /* ---------------------------------------*/
@@ -1980,7 +1986,7 @@ TEXT ·p256PointAddAsm(SB),0,$392-32
 	OR	t1, t0, t0  
 	SGTU	t0, R0, t1        // t1 = (t0 != 0) => 1 表示非零  
 	XOR	$1, t1, t1         // t1 = (t0 == 0) => 1 表示 r==0  
-	AND	t1, t2, hlp1        // hlp1 = r==0 ? 1 : 0 (临时，稍后立即落栈)  
+	MOVV	t1, hlp1
   
 	XOR	$-1, x0, t0  
 	MOVV	p256const0<>(SB), t5
@@ -1997,6 +2003,7 @@ TEXT ·p256PointAddAsm(SB),0,$392-32
 	MOVV	hlp1, degflag(0)    // 立即落栈，避免后续 CALL 污染  
   
 	// ---- u1 = X1 * z2sqr ----  
+	RELOAD_PTRS			// a_ptr/b_ptr were clobbered by previous CALL
 	LDx(x1in)  
 	LDy(z2sqrv)  
 	CALL	p256MulInternal<>(SB)  
