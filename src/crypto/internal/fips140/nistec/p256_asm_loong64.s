@@ -1342,8 +1342,9 @@ TEXT ·p256Mul(SB),NOSPLIT,$16-24
 	MOVV	in1+8(FP), a_ptr ;\
 	MOVV	in2+16(FP), b_ptr
 
+#define z3save(off)	(8 + 32*12 + off)(R3)	// z3 暂存，避免 res==in1 时覆写 z1in
 // func p256PointAddAffineAsm(res, in1 *P256Point, in2 *p256AffinePoint, sign, sel, zero int)  
-TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
+TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$432-48
 	MOVV    R1, (8+32*9)(R3)    // save return address across CALLs
 	// sign/sel/zero 不能借用 hlp0(=b_ptr)/y1(=a_ptr)，先用 t5/t6 承接  
 	MOVV	sign+24(FP), t5      // t5 = sign  
@@ -1420,6 +1421,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	RELOAD_PTRS                     // 策略3：立即重新加载  
   
 	LDx(x2in)  
+	LDy(z1sqr)				// y = z1²（RELOAD_PTRS 毁了 y1）
 	CALL	p256MulInternal<>(SB)    // u2 = x2 * z1^2  
 	MOVV	y0, rsqr(0*8)
 	MOVV	y1, rsqr(1*8)
@@ -1438,22 +1440,21 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	STy(s2v)
 	RELOAD_PTRS  
 
-	// p256MulInternal 会破坏 a_ptr/b_ptr/y1, 因此必须在 PELOAD_PTRS之后重新加载z3
+	// 条件覆盖 z3: 位0为0->z1; 位1为0->1  
+	// 先读 z1in（需要 a_ptr，上一步 RELOAD_PTRS 已恢复）
+	MOVV	z1in(0*8), acc0  
+	MOVV	z1in(1*8), acc1  
+	MOVV	z1in(2*8), acc2  
+	MOVV	z1in(3*8), acc3  
+
+	// 再恢复 y = z3（s2v 是 R3 相对槽，不依赖 a_ptr；
+	// y1 最后写入，此后不再有任何 a_ptr 解引用）
 	MOVV	s2v(0*8), y0
 	MOVV	s2v(1*8), t4
 	MOVV	s2v(2*8), y2
 	MOVV	s2v(3*8), y3
 	MOVV	t4, y1
 
-	// y1与a_ptr使用同一个物理寄存器，重新加载z3后会覆盖a_ptr
-	// 后面的z1in需要a_ptr，因此这里必须再次恢复参数指针
-	RELOAD_PTRS
-  
-	// 条件覆盖 z3: 位0为0->z1; 位1为0->1  
-	MOVV	z1in(0*8), acc0  
-	MOVV	z1in(1*8), acc1  
-	MOVV	z1in(2*8), acc2  
-	MOVV	z1in(3*8), acc3  
 	MOVV    selflag(0), t1       // 重新加载位掩码，t1可能已被内部函数调用覆写
         AND     $1, t1, t2  
 	NEGV	t2, t2               // 0/1 -> 0/全1掩码  
@@ -1480,12 +1481,11 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	AND	t2, y3, y3; AND t3, acc3, acc3; OR y3, acc3, y3  
   
 	// Save the selected z3 before loading the next temporary.
-	MOVV	res+0(FP), t0
-	MOVV	y0, 8*8(t0)
-	MOVV	y1, 9*8(t0)
-	MOVV	y2, 10*8(t0)
-	MOVV	y3, 11*8(t0)
+	// 不能直接写 res.z：res==in1 时下游 LDx(z1in) 还要读旧 z1  
+	STy(z3save)	// y0..y3 -> z3save
 
+	MOVV	in1+8(FP), a_ptr		// y 已落栈，恢复 a_ptr 再读 in1
+	LDx(z1in)				// x = z1（此前 x 残留的是 h）
 	LDy(z1sqr)  
 	CALL	p256MulInternal<>(SB)    // z1^3  
 	MOVV	y0, rsqr(0*8)
@@ -1501,6 +1501,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	RELOAD_PTRS  
   
 	LDx(y1in)  
+	LDy(s2v)				// y = s2
 	CALL	p256SubInternal<>(SB)    // r = s2 - y1  
 	STx(rv)  
 	RELOAD_PTRS  
@@ -1514,11 +1515,13 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	STy(hsqr)  
 	RELOAD_PTRS  
   
+	LDy(hsqr)				// y = h²
 	CALL	p256MulInternal<>(SB)    // hcub = h^3  
 	STy(hcub)  
 	RELOAD_PTRS  
   
 	LDx(y1in)  
+	LDy(hcub)				// y = hcub
 	CALL	p256MulInternal<>(SB)    // s2' = y1 * hcub  
 	STy(s2v)  
 	RELOAD_PTRS  
@@ -1566,6 +1569,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	AND	t2, x2, x2; AND t3, acc2, acc2; OR x2, acc2, x2  
 	AND	t2, x3, x3; AND t3, acc3, acc3; OR x3, acc3, x3
   
+	RELOAD_PTRS 
 	MOVV	x2in(0*8), acc0  
 	MOVV	x2in(1*8), acc1  
 	MOVV	x2in(2*8), acc2  
@@ -1580,7 +1584,8 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	AND     t2, x1, x1; AND t3, acc1, acc1; OR x1, acc1, x1  
 	AND     t2, x2, x2; AND t3, acc2, acc2; OR x2, acc2, x2  
 	AND     t2, x3, x3; AND t3, acc3, acc3; OR x3, acc3, x3
-  
+
+	RELOAD_PTRS  
 	MOVV	res+0(FP), t0  
 	MOVV	x0, 0*8(t0)  
 	MOVV	x1, 1*8(t0)  
@@ -1646,6 +1651,13 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 	MOVV	x1, 5*8(t0)  
 	MOVV	x2, 6*8(t0)  
 	MOVV	x3, 7*8(t0)  
+
+	// 函数尾部统一写回 res.z（此时所有 z1in 读取已完成）
+	LDx(z3save)
+	MOVV	x0, 8*8(t0)
+	MOVV	x1, 9*8(t0)
+	MOVV	x2, 10*8(t0)
+	MOVV	x3, 11*8(t0)
   
   	MOVV    (8+32*9)(R3), R1    // restore return address
 	RET
@@ -1657,7 +1669,7 @@ TEXT ·p256PointAddAffineAsm(SB),NOSPLIT,$368-48
 #define h2v(off)   (8 + 32*2 + off)(R3)  
 #define sv(off)    (8 + 32*3 + off)(R3)  
 #define tmpv(off)  (8 + 32*4 + off)(R3)  
-#define y3tmp(off) (8 + 32*5 + off)(R3)  
+#define y3tmp(off) (8 + 32*5 + off)(R3)
   
 // ---- 模P半减：y0..y3 = (y0..y3) / 2 mod P ----  
 // 若为偶数直接右移1位；若为奇数先加P再右移1位  
